@@ -1,0 +1,25 @@
+{
+  "rules": {
+    "devices": {
+      "$device_id": {
+        "logs": {
+          ".read": true,
+          ".write": "auth != null",
+          "$timestamp": {
+            ".validate": "newData.isNumber() && newData.val() >= -40 && newData.val() <= 125"
+          }
+        },
+        "info": {
+          ".read": true,
+          ".write": "auth != null",
+          "zone": {
+            ".validate": "newData.isString()"
+          },
+          "lastSeen": {
+            ".validate": "newData.isNumber()"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>ESP32 Firebase Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 20px;
+      background-color: #f5f5f5;
+    }
+    .card {
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,.1);
+    }
+    .card-header {
+      background-color: #f8f9fa;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="pb-3 mb-4 border-bottom">
+      <h1 class="display-5 fw-bold text-primary">ESP32 Temperature Dashboard</h1>
+    </header>
+
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Device Selection</span>
+            <button id="refreshDevices" class="btn btn-sm btn-outline-primary">Refresh</button>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="deviceSelect" class="form-label">Select Device:</label>
+              <select id="deviceSelect" class="form-select"></select>
+            </div>
+            <div id="deviceInfo" class="mt-3">
+              <p><strong>Zone:</strong> <span id="deviceZone">-</span></p>
+              <p><strong>IP Address:</strong> <span id="deviceIP">-</span></p>
+              <p><strong>Last Seen:</strong> <span id="deviceLastSeen">-</span></p>
+              <p><strong>Current Temperature:</strong> <span id="currentTemp">-</span> °C</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">Device Configuration</div>
+          <div class="card-body">
+            <form id="configForm">
+              <div class="mb-3">
+                <label for="threshold" class="form-label">Temperature Threshold (°C):</label>
+                <input type="number" class="form-control" id="threshold" step="0.1" required>
+                <div class="form-text">Alert will be sent when temperature exceeds this value</div>
+              </div>
+              <div class="mb-3">
+                <label for="telegramToken" class="form-label">Telegram Bot Token:</label>
+                <input type="text" class="form-control" id="telegramToken">
+              </div>
+              <div class="mb-3">
+                <label for="chatId" class="form-label">Telegram Chat ID:</label>
+                <input type="text" class="form-control" id="chatId">
+              </div>
+              <div class="mb-3">
+                <label for="deviceZoneInput" class="form-label">Zone Assignment:</label>
+                <select class="form-select" id="deviceZoneInput">
+                  <option value="Building 1">Building 1</option>
+                  <option value="Building 2">Building 2</option>
+                  <option value="Building 3">Building 3</option>
+                  <option value="Lab">Lab</option>
+                  <option value="Office">Office</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Temperature History</span>
+        <div>
+          <select id="timeRange" class="form-select form-select-sm" style="width: auto; display: inline-block;">
+            <option value="10">Last 10 readings</option>
+            <option value="20">Last 20 readings</option>
+            <option value="50">Last 50 readings</option>
+            <option value="100">Last 100 readings</option>
+          </select>
+          <button id="refreshChart" class="btn btn-sm btn-outline-primary ms-2">Refresh</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <canvas id="tempChart" width="800" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script th:inline="javascript">
+    let selectedDevice = "";
+    let tempChart = null;
+
+    async function loadDevices() {
+      try {
+        const res = await fetch('/api/devices');
+        if (!res.ok) throw new Error('Failed to fetch devices');
+        
+        const devices = await res.json();
+        const select = document.getElementById('deviceSelect');
+        select.innerHTML = '';
+        
+        if (devices.length === 0) {
+          const option = document.createElement('option');
+          option.value = "";
+          option.textContent = "No devices found";
+          select.appendChild(option);
+          return;
+        }
+        
+        devices.forEach(d => {
+          const option = document.createElement('option');
+          option.value = d.id;
+          option.textContent = `${d.id} (${d.zone || 'Unassigned'})`;
+          select.appendChild(option);
+        });
+        
+        select.onchange = () => {
+          selectedDevice = select.value;
+          loadDeviceDetails(selectedDevice);
+          loadDeviceConfig(selectedDevice);
+          loadLogs(selectedDevice);
+        };
+        
+        // Select first device by default
+        if (devices.length > 0) {
+          selectedDevice = devices[0].id;
+          select.value = selectedDevice;
+          loadDeviceDetails(selectedDevice);
+          loadDeviceConfig(selectedDevice);
+          loadLogs(selectedDevice);
+        }
+      } catch (error) {
+        console.error('Error loading devices:', error);
+        alert('Failed to load devices. Check console for details.');
+      }
+    }
+
+    async function loadDeviceDetails(deviceId) {
+      if (!deviceId) return;
+      
+      try {
+        const res = await fetch(`/api/devices`);
+        if (!res.ok) throw new Error('Failed to fetch device details');
+        
+        const devices = await res.json();
+        const device = devices.find(d => d.id === deviceId);
+        
+        if (device) {
+          document.getElementById('deviceZone').textContent = device.zone || 'Unassigned';
+          document.getElementById('deviceIP').textContent = device.ip || 'Unknown';
+          
+          if (device.lastSeen) {
+            const date = new Date(device.lastSeen * 1000);
+            document.getElementById('deviceLastSeen').textContent = date.toLocaleString();
+          } else {
+            document.getElementById('deviceLastSeen').textContent = 'Unknown';
+          }
+          
+          document.getElementById('currentTemp').textContent = 
+            device.temperature !== undefined ? device.temperature.toFixed(1) : 'Unknown';
+          
+          // Update zone selector
+          if (device.zone) {
+            const zoneSelect = document.getElementById('deviceZoneInput');
+            const zoneExists = Array.from(zoneSelect.options).some(option => option.value === device.zone);
+            
+            if (!zoneExists) {
+              const option = document.createElement('option');
+              option.value = device.zone;
+              option.textContent = device.zone;
+              zoneSelect.appendChild(option);
+            }
+            
+            zoneSelect.value = device.zone;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading device details:', error);
+      }
+    }
+
+    async function loadDeviceConfig(deviceId) {
+      if (!deviceId) return;
+      
+      try {
+        const res = await fetch(`/api/devices/${deviceId}/config`);
+        if (!res.ok) throw new Error('Failed to fetch device configuration');
+        
+        const config = await res.json();
+        
+        document.getElementById('threshold').value = config.threshold || 30;
+        document.getElementById('telegramToken').value = config.telegramToken || '';
+        document.getElementById('chatId').value = config.chatId || '';
+      } catch (error) {
+        console.error('Error loading device configuration:', error);
+      }
+    }
+
+    async function loadLogs(deviceId, limit = 50) {
+      if (!deviceId) return;
+      
+      try {
+        const res = await fetch(`/api/devices/${deviceId}/logs?limit=${limit}`);
+        if (!res.ok) throw new Error('Failed to fetch device logs');
+        
+        const data = await res.json();
+        const labels = Object.keys(data).map(timestamp => {
+          const date = new Date(timestamp.replace('T', ' '));
+          return date.toLocaleTimeString();
+        });
+        const temps = Object.values(data);
+
+        const ctx = document.getElementById('tempChart').getContext('2d');
+        
+        if (tempChart) tempChart.destroy();
+        
+        tempChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: `Temperature for ${deviceId}`,
+              data: temps,
+              borderColor: 'rgb(75, 192, 192)',
+              tension: 0.1,
+              fill: false
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: `Temperature Readings for ${deviceId}`
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: false,
+                title: {
+                  display: true,
+                  text: 'Temperature (°C)'
+                }
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: 'Time'
+                }
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error loading device logs:', error);
+        alert('Failed to load temperature logs. Check console for details.');
+      }
+    }
+
+    document.getElementById('configForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (!selectedDevice) {
+        alert('Please select a device first');
+        return;
+      }
+      
+      const threshold = parseFloat(document.getElementById('threshold').value);
+      const token = document.getElementById('telegramToken').value;
+      const chatId = document.getElementById('chatId').value;
+      const zone = document.getElementById('deviceZoneInput').value;
+
+      try {
+        // Save device config
+        const configRes = await fetch(`/api/devices/${selectedDevice}/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            threshold, 
+            telegramToken: token, 
+            chatId,
+            alertEnabled: true
+          })
+        });
+
+        if (!configRes.ok) throw new Error('Failed to save configuration');
+
+        // Update device zone
+        const zoneRes = await fetch(`/api/devices/${selectedDevice}/zone`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ zone })
+        });
+
+        if (!zoneRes.ok) throw new Error('Failed to update zone');
+
+        alert('✅ Configuration saved successfully!');
+        loadDeviceDetails(selectedDevice);
+      } catch (error) {
+        console.error('Error saving configuration:', error);
+        alert('❌ Failed to save configuration. Check console for details.');
+      }
+    });
+
+    document.getElementById('refreshDevices').addEventListener('click', () => {
+      loadDevices();
+    });
+
+    document.getElementById('refreshChart').addEventListener('click', () => {
+      const limit = document.getElementById('timeRange').value;
+      loadLogs(selectedDevice, limit);
+    });
+
+    document.getElementById('timeRange').addEventListener('change', () => {
+      const limit = document.getElementById('timeRange').value;
+      loadLogs(selectedDevice, limit);
+    });
+
+    // Initial load
+    loadDevices();
+  </script>
+</body>
+</html>
