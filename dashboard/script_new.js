@@ -326,10 +326,7 @@ function updateDevicesDisplay() {
 
         // Zone devices container
         const zoneDevices = document.createElement('div');
-        zoneDevices.className = 'zone-devices';
-        zoneDevices.style.display = 'grid';
-        zoneDevices.style.gridTemplateColumns = 'repeat(4, 1fr)';
-        zoneDevices.style.gap = '10px';
+        zoneDevices.className = 'zone-devices grid-4x4';
 
         devices.forEach(device => {
             const deviceCard = createDeviceCard(device);
