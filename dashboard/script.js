@@ -33,7 +33,7 @@ const settings = {
 };
 
 // DOM elements
-let connectionStatus, deviceIdElement, deviceZoneElement, lastSeenElement, deviceStatusElement, lastUpdateElement, temperatureElement, minTempElement, maxTempElement, avgTempElement, devicesContainer;
+let connectionStatus, zonesContainer, chartDeviceName, chartLastUpdate;
 
 // Initialize DOM elements
 function initDOMElements() {
