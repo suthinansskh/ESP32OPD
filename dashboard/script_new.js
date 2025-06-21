@@ -58,14 +58,14 @@ function initChart() {
             datasets: [{
                 label: 'Temperature (°C)',
                 data: [],
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderColor: '#4a90e2',
+                backgroundColor: 'rgba(74, 144, 226, 0.1)',
                 borderWidth: 3,
                 fill: true,
                 tension: 0.4,
                 pointRadius: 4,
                 pointHoverRadius: 8,
-                pointBackgroundColor: '#667eea',
+                pointBackgroundColor: '#4a90e2',
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 2
             }]
@@ -88,7 +88,7 @@ function initChart() {
                     backgroundColor: 'rgba(0,0,0,0.8)',
                     titleColor: 'white',
                     bodyColor: 'white',
-                    borderColor: '#667eea',
+                    borderColor: '#4a90e2',
                     borderWidth: 1
                 }
             },
@@ -216,6 +216,11 @@ function listenToDevices() {
                 updateDevicesDisplay();
                 updateChartDisplay();
                 updateLastRefreshTime();
+                
+                // Update device details if a device is selected
+                if (currentDevice) {
+                    updateDeviceDetails(currentDevice);
+                }
             } else {
                 showNoDevicesMessage();
             }
@@ -428,10 +433,286 @@ function selectDevice(deviceId) {
         }
     });
     
+    // Update device details
+    updateDeviceDetails(deviceId);
+    
     // Update chart
     updateChartDisplay();
     
     console.log('Selected device:', deviceId);
+}
+
+// Update device details section
+function updateDeviceDetails(deviceId) {
+    const container = document.getElementById('device-info-container');
+    if (!container) return;
+    
+    if (!deviceId || !allDevices[deviceId]) {
+        // Show no device selected message
+        container.innerHTML = `
+            <div class="no-device-selected">
+                <i class="fas fa-mouse-pointer"></i>
+                <p>Select a device from the left to view details</p>
+                <small>Click on any device card to see detailed information</small>
+            </div>
+        `;
+        return;
+    }
+    
+    const device = allDevices[deviceId];
+    const lastSeen = device.lastSeen ? new Date(device.lastSeen) : null;
+    const status = getDeviceStatus(device);
+    const temp = device.temperature || 0;
+    const logs = device.logs || {};
+    
+    // Calculate enhanced statistics
+    const logEntries = Object.values(logs);
+    const todayLogs = logEntries.filter(log => {
+        const logDate = new Date(log.timestamp);
+        const today = new Date();
+        return logDate.toDateString() === today.toDateString();
+    });
+    
+    const temperatures = logEntries.map(log => log.temperature).filter(t => t != null);
+    const stats = {
+        todayReadings: todayLogs.length,
+        totalReadings: logEntries.length,
+        avgTemp: temperatures.length > 0 ? (temperatures.reduce((a, b) => a + b, 0) / temperatures.length) : temp,
+        minTemp: temperatures.length > 0 ? Math.min(...temperatures) : temp,
+        maxTemp: temperatures.length > 0 ? Math.max(...temperatures) : temp,
+        uptime: lastSeen ? getTimeSince(lastSeen) : '--',
+        firstSeen: logEntries.length > 0 ? new Date(Math.min(...logEntries.map(log => new Date(log.timestamp)))) : null
+    };
+    
+    // Get status icon and color
+    const statusConfig = {
+        online: { icon: 'fas fa-circle', color: '#10b981' },
+        warning: { icon: 'fas fa-exclamation-triangle', color: '#f59e0b' },
+        offline: { icon: 'fas fa-times-circle', color: '#ef4444' }
+    };
+    
+    const statusInfo = statusConfig[status] || statusConfig.offline;
+    
+    container.innerHTML = `
+        <div class="device-info-content">
+            <div class="device-info-header">
+                <div class="device-info-title">
+                    <i class="fas fa-microchip"></i>
+                    ${deviceId}
+                    <span class="device-badge">${device.zone || 'Unknown Zone'}</span>
+                </div>
+                <div class="device-info-status">
+                    <div class="status-dot status-${status}"></div>
+                    <span class="device-status status-${status}-text">${status.toUpperCase()}</span>
+                </div>
+            </div>
+            
+            <div class="device-info-grid">
+                <div class="info-card temperature-card">
+                    <div class="info-card-icon">
+                        <i class="fas fa-thermometer-half"></i>
+                    </div>
+                    <div class="info-card-content">
+                        <div class="info-card-label">Current Temperature</div>
+                        <div class="info-card-value temperature">${formatTemperature(temp)}</div>
+                    </div>
+                </div>
+                
+                <div class="info-card status-card">
+                    <div class="info-card-icon" style="color: ${statusInfo.color}">
+                        <i class="${statusInfo.icon}"></i>
+                    </div>
+                    <div class="info-card-content">
+                        <div class="info-card-label">Connection Status</div>
+                        <div class="info-card-value">${status.toUpperCase()}</div>
+                    </div>
+                </div>
+                
+                <div class="info-card time-card">
+                    <div class="info-card-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="info-card-content">
+                        <div class="info-card-label">Last Update</div>
+                        <div class="info-card-value">${lastSeen ? formatTime(lastSeen) : 'Never'}</div>
+                        <div class="info-card-subtitle">${lastSeen ? getTimeSince(lastSeen) : '--'}</div>
+                    </div>
+                </div>
+                
+                <div class="info-card location-card">
+                    <div class="info-card-icon">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </div>
+                    <div class="info-card-content">
+                        <div class="info-card-label">Zone Location</div>
+                        <div class="info-card-value">${device.zone || 'Unknown'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="temperature-range">
+                <h4><i class="fas fa-chart-bar"></i> Temperature Range</h4>
+                <div class="temp-range-display">
+                    <div class="temp-range-item min">
+                        <span class="range-label">Min</span>
+                        <span class="range-value">${formatTemperature(stats.minTemp)}</span>
+                    </div>
+                    <div class="temp-range-item avg">
+                        <span class="range-label">Avg</span>
+                        <span class="range-value">${formatTemperature(stats.avgTemp)}</span>
+                    </div>
+                    <div class="temp-range-item max">
+                        <span class="range-label">Max</span>
+                        <span class="range-value">${formatTemperature(stats.maxTemp)}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="device-stats">
+                <div class="stat-item">
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-day"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Today's Readings</div>
+                        <div class="stat-value">${stats.todayReadings}</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Records</div>
+                        <div class="stat-value">${stats.totalReadings}</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">First Seen</div>
+                        <div class="stat-value">${stats.firstSeen ? formatDate(stats.firstSeen) : '--'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="device-actions">
+                <button class="action-btn primary" onclick="viewDeviceHistory('${deviceId}')">
+                    <i class="fas fa-chart-line"></i>
+                    View History
+                </button>
+                <button class="action-btn secondary" onclick="exportDeviceData('${deviceId}')">
+                    <i class="fas fa-download"></i>
+                    Export Data
+                </button>
+                <button class="action-btn tertiary" onclick="refreshDeviceData('${deviceId}')">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Helper function to format date
+function formatDate(date) {
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
+
+// Action functions for device details
+function viewDeviceHistory(deviceId) {
+    // Open history page with device pre-selected
+    window.open(`quick_history.html?device=${encodeURIComponent(deviceId)}`, '_blank');
+}
+
+function exportDeviceData(deviceId) {
+    if (!allDevices[deviceId]) {
+        alert('Device data not available');
+        return;
+    }
+    
+    const device = allDevices[deviceId];
+    const logs = device.logs || {};
+    
+    // Prepare CSV data
+    const csvData = [
+        ['Timestamp', 'Temperature', 'Zone', 'Device ID']
+    ];
+    
+    Object.values(logs).forEach(log => {
+        csvData.push([
+            new Date(log.timestamp).toISOString(),
+            log.temperature,
+            device.zone || 'Unknown',
+            deviceId
+        ]);
+    });
+    
+    // Convert to CSV string
+    const csvString = csvData.map(row => row.join(',')).join('\n');
+    
+    // Download CSV file
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${deviceId}_temperature_data.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function refreshDeviceData(deviceId) {
+    // Refresh the specific device data
+    console.log('Refreshing data for device:', deviceId);
+    
+    // Show loading indicator
+    const refreshBtn = event.target.closest('.action-btn');
+    const originalHTML = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+    refreshBtn.disabled = true;
+    
+    // Simulate refresh (in real implementation, this would fetch from Firebase)
+    setTimeout(() => {
+        refreshBtn.innerHTML = originalHTML;
+        refreshBtn.disabled = false;
+        
+        // Update the device details
+        updateDeviceDetails(deviceId);
+        
+        // Show success message
+        showNotification('Device data refreshed successfully', 'success');
+    }, 1500);
+}
+
+// Notification system
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 3000);
 }
 
 // Update chart display
@@ -649,6 +930,29 @@ function toggleAutoRefresh() {
     } else {
         stopAutoRefresh();
     }
+}
+
+// Helper function to format time
+function formatTime(date) {
+    return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+// Helper function to get time since last seen
+function getTimeSince(date) {
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return 'Just now';
 }
 
 // Utility functions
