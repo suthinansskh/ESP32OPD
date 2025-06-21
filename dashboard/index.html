@@ -28,6 +28,15 @@
         <div class="main-section">
             <div class="card devices-by-zone">
                 <h2><i class="fas fa-map-marker-alt"></i> Devices by Zone</h2>
+                <div class="selection-controls">
+                    <button class="control-btn" onclick="selectAllDevices()" title="Select All Devices">
+                        <i class="fas fa-check-double"></i> Select All
+                    </button>
+                    <button class="control-btn" onclick="clearAllSelections()" title="Clear All Selections">
+                        <i class="fas fa-times"></i> Clear All
+                    </button>
+                    <span class="selection-count" id="selection-count">0 selected</span>
+                </div>
                 <div id="zones-container">
                     <!-- Zones จะถูกสร้างที่นี่ -->
                 </div>

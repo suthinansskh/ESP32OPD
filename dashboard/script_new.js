@@ -15,6 +15,7 @@ const database = firebase.database();
 
 // Global variables
 let currentDevice = null;
+let selectedDevices = new Set(); // For multiple device selection
 let allDevices = {};
 let devicesByZone = {};
 let chart = null;
@@ -55,20 +56,7 @@ function initChart() {
         type: 'line',
         data: {
             labels: [],
-            datasets: [{
-                label: 'Temperature (°C)',
-                data: [],
-                borderColor: '#4a90e2',
-                backgroundColor: 'rgba(74, 144, 226, 0.1)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 4,
-                pointHoverRadius: 8,
-                pointBackgroundColor: '#4a90e2',
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2
-            }]
+            datasets: [] // Start with empty datasets for multiple devices
         },
         options: {
             responsive: true,
@@ -135,7 +123,13 @@ function setupEventListeners() {
             document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             currentPeriod = e.target.dataset.period;
-            updateChartData();
+            
+            // Update chart based on selection mode
+            if (selectedDevices.size > 0) {
+                updateMultiDeviceChart();
+            } else {
+                updateChartData();
+            }
         });
     });
 
@@ -343,7 +337,14 @@ function updateDevicesDisplay() {
 function createDeviceCard(device) {
     const deviceCard = document.createElement('div');
     deviceCard.className = `device-card ${device.id === currentDevice ? 'active' : ''}`;
-    deviceCard.onclick = () => selectDevice(device.id);
+    
+    // Add click handler that doesn't interfere with checkbox
+    deviceCard.addEventListener('click', (e) => {
+        // Don't trigger selection if clicking on checkbox
+        if (e.target.type !== 'checkbox') {
+            selectDevice(device.id);
+        }
+    });
     
     // Get device status
     const status = getDeviceStatus(device);
@@ -353,7 +354,12 @@ function createDeviceCard(device) {
     
     deviceCard.innerHTML = `
         <div class="device-header">
-            <div class="device-name">${device.id}</div>
+            <div class="device-name-section">
+                <input type="checkbox" class="device-checkbox" data-device-id="${device.id}" 
+                       onchange="toggleDeviceSelection('${device.id}')" 
+                       ${selectedDevices.has(device.id) ? 'checked' : ''}>
+                <div class="device-name">${device.id}</div>
+            </div>
             <div class="device-status">
                 <span class="status-dot ${status.class}"></span>
                 ${status.text}
@@ -413,6 +419,12 @@ function getLatestTemperature(device) {
     
     if (isNaN(temp)) return '--°C';
     
+    return convertTemperature(temp).toFixed(1) + getTemperatureUnit();
+}
+
+// Helper function to format temperature for display
+function formatTemperature(temp) {
+    if (isNaN(temp)) return '--°C';
     return convertTemperature(temp).toFixed(1) + getTemperatureUnit();
 }
 
@@ -728,30 +740,36 @@ function showNotification(message, type = 'info') {
 
 // Update chart display
 function updateChartDisplay() {
+    // If we have selected devices for multi-view, use multi-device chart
+    if (selectedDevices.size > 0) {
+        updateMultiDeviceChart();
+        return;
+    }
+    
+    // Fall back to single device mode
     if (!currentDevice || !allDevices[currentDevice]) {
         // Show "Select a device" message
         if (chartDeviceName) {
-            chartDeviceName.textContent = 'Select a device to view chart';
+            chartDeviceName.textContent = 'Select devices using checkboxes to view chart';
             chartDeviceName.style.color = '#666';
         }
         if (chartLastUpdate) {
-            chartLastUpdate.textContent = 'No device selected';
+            chartLastUpdate.textContent = 'Use checkboxes to select multiple devices';
             chartLastUpdate.style.color = '#666';
         }
         
         // Clear chart with placeholder message
         chart.data.labels = [];
-        chart.data.datasets[0].data = [];
-        chart.data.datasets[0].label = 'Temperature (°C)';
+        chart.data.datasets = [];
         chart.update();
         
-        console.log('Chart cleared - no device selected');
+        console.log('Chart cleared - no devices selected');
         return;
     }
     
     const device = allDevices[currentDevice];
     
-    // Update chart info header
+    // Update chart info header for single device
     if (chartDeviceName) {
         chartDeviceName.textContent = `${currentDevice} (${device.zone || 'Unknown Zone'})`;
         chartDeviceName.style.color = '#4a90e2';
@@ -761,10 +779,10 @@ function updateChartDisplay() {
         chartLastUpdate.style.color = '#666';
     }
     
-    // Update chart data for the selected device
+    // Update chart data for single device
     updateChartData();
     
-    console.log(`Chart updated for device: ${currentDevice}`);
+    console.log(`Chart updated for single device: ${currentDevice}`);
 }
 
 // Update chart data based on selected time period
@@ -772,8 +790,7 @@ function updateChartData() {
     if (!currentDevice || !allDevices[currentDevice] || !allDevices[currentDevice].logs) {
         // Clear chart when no device is selected or no data available
         chart.data.labels = [];
-        chart.data.datasets[0].data = [];
-        chart.data.datasets[0].label = 'Temperature (°C)';
+        chart.data.datasets = [];
         chart.update();
         console.log('Chart cleared - no data available');
         return;
@@ -824,19 +841,151 @@ function updateChartData() {
     if (filteredData.length === 0) {
         // Show empty state for selected time period
         chart.data.labels = [];
-        chart.data.datasets[0].data = [];
-        chart.data.datasets[0].label = `No data for ${currentPeriod} period`;
+        chart.data.datasets = [];
         console.log(`No data available for ${currentDevice} in ${currentPeriod} period`);
     } else {
+        // Create single device dataset
+        const device = allDevices[currentDevice];
+        const dataset = {
+            label: `${currentDevice} (${device.zone || 'Unknown'}) - Temperature (${getTemperatureUnit()})`,
+            data: filteredData,
+            borderColor: '#4a90e2',
+            backgroundColor: 'rgba(74, 144, 226, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 8,
+            pointBackgroundColor: '#4a90e2',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2
+        };
+        
         // Update with actual data
         chart.data.labels = filteredData.map(entry => new Date(entry.x));
-        chart.data.datasets[0].data = filteredData;
-        chart.data.datasets[0].label = `${currentDevice} - Temperature (${getTemperatureUnit()})`;
+        chart.data.datasets = [dataset];
         console.log(`Updated chart with ${filteredData.length} data points for ${currentDevice} (${currentPeriod} period)`);
     }
     
     // Update the chart
     chart.update('none'); // Use 'none' for faster updates without animation
+}
+
+// Update chart with multiple devices
+function updateMultiDeviceChart() {
+    if (selectedDevices.size === 0) {
+        // Clear chart when no devices selected
+        chart.data.labels = [];
+        chart.data.datasets = [];
+        chart.update();
+        
+        // Update chart header
+        if (chartDeviceName) {
+            chartDeviceName.textContent = 'Select devices to view chart';
+            chartDeviceName.style.color = '#666';
+        }
+        if (chartLastUpdate) {
+            chartLastUpdate.textContent = 'No devices selected';
+            chartLastUpdate.style.color = '#666';
+        }
+        return;
+    }
+    
+    // Collect all timestamps from selected devices
+    const allTimestamps = new Set();
+    const deviceDataSets = {};
+    
+    selectedDevices.forEach(deviceId => {
+        const device = allDevices[deviceId];
+        if (device && device.logs) {
+            const logs = device.logs;
+            const now = Date.now();
+            let startTime;
+            
+            // Calculate start time based on current period
+            switch (currentPeriod) {
+                case '1h':
+                    startTime = now - (60 * 60 * 1000);
+                    break;
+                case '6h':
+                    startTime = now - (6 * 60 * 60 * 1000);
+                    break;
+                case '24h':
+                    startTime = now - (24 * 60 * 60 * 1000);
+                    break;
+                case '7d':
+                    startTime = now - (7 * 24 * 60 * 60 * 1000);
+                    break;
+                default:
+                    startTime = now - (60 * 60 * 1000);
+            }
+            
+            // Filter and process device data
+            const filteredData = Object.entries(logs)
+                .map(([timestamp, temp]) => ({
+                    x: parseInt(timestamp),
+                    y: convertTemperature(temp)
+                }))
+                .filter(entry => entry.x >= startTime)
+                .sort((a, b) => a.x - b.x);
+            
+            deviceDataSets[deviceId] = filteredData;
+            
+            // Collect timestamps
+            filteredData.forEach(entry => allTimestamps.add(entry.x));
+        }
+    });
+    
+    // Create sorted timestamp array
+    const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+    
+    // Create datasets for each device
+    const datasets = [];
+    let colorIndex = 0;
+    
+    selectedDevices.forEach(deviceId => {
+        const device = allDevices[deviceId];
+        if (deviceDataSets[deviceId]) {
+            const borderColor = generateDeviceColor(colorIndex);
+            const backgroundColor = generateDeviceBackgroundColor(borderColor);
+            
+            datasets.push({
+                label: `${deviceId} (${device.zone || 'Unknown'})`,
+                data: deviceDataSets[deviceId],
+                borderColor: borderColor,
+                backgroundColor: backgroundColor,
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointBackgroundColor: borderColor,
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 1
+            });
+            
+            colorIndex++;
+        }
+    });
+    
+    // Update chart
+    chart.data.labels = sortedTimestamps.map(timestamp => new Date(timestamp));
+    chart.data.datasets = datasets;
+    chart.update();
+    
+    // Update chart header
+    if (chartDeviceName) {
+        const deviceNames = Array.from(selectedDevices).slice(0, 3).join(', ');
+        const extraCount = selectedDevices.size > 3 ? ` +${selectedDevices.size - 3} more` : '';
+        chartDeviceName.textContent = `${deviceNames}${extraCount}`;
+        chartDeviceName.style.color = '#4a90e2';
+    }
+    if (chartLastUpdate) {
+        chartLastUpdate.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+        chartLastUpdate.style.color = '#666';
+    }
+    
+    console.log(`Chart updated with ${selectedDevices.size} devices`);
 }
 
 // Update connection status
@@ -1063,3 +1212,93 @@ function retryConnection() {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', initDashboard);
+
+// Multiple device selection functionality
+function toggleDeviceSelection(deviceId) {
+    if (selectedDevices.has(deviceId)) {
+        selectedDevices.delete(deviceId);
+        console.log(`Device ${deviceId} removed from selection`);
+    } else {
+        selectedDevices.add(deviceId);
+        console.log(`Device ${deviceId} added to selection`);
+    }
+    
+    // Update visual state
+    updateDeviceSelectionVisuals();
+    
+    // Update chart with multiple devices
+    updateMultiDeviceChart();
+    
+    // Show notification
+    const count = selectedDevices.size;
+    if (count === 0) {
+        showNotification('No devices selected for chart', 'info');
+    } else if (count === 1) {
+        showNotification(`1 device selected for chart`, 'success');
+    } else {
+        showNotification(`${count} devices selected for chart`, 'success');
+    }
+}
+
+function updateDeviceSelectionVisuals() {
+    // Update device cards visual state
+    document.querySelectorAll('.device-card').forEach(card => {
+        const checkbox = card.querySelector('.device-checkbox');
+        const deviceId = checkbox?.dataset.deviceId;
+        
+        if (deviceId) {
+            if (selectedDevices.has(deviceId)) {
+                card.classList.add('selected');
+                checkbox.checked = true;
+            } else {
+                card.classList.remove('selected');
+                checkbox.checked = false;
+            }
+        }
+    });
+    
+    // Update selection counter
+    const selectionCount = document.getElementById('selection-count');
+    if (selectionCount) {
+        const count = selectedDevices.size;
+        selectionCount.textContent = count === 0 ? 'No devices selected' : 
+                                    count === 1 ? '1 device selected' : 
+                                    `${count} devices selected`;
+    }
+}
+
+function selectAllDevices() {
+    selectedDevices.clear();
+    Object.keys(allDevices).forEach(deviceId => {
+        selectedDevices.add(deviceId);
+    });
+    updateDeviceSelectionVisuals();
+    updateMultiDeviceChart();
+    showNotification(`${selectedDevices.size} devices selected for chart`, 'success');
+}
+
+function clearAllSelections() {
+    selectedDevices.clear();
+    updateDeviceSelectionVisuals();
+    updateMultiDeviceChart();
+    showNotification('All device selections cleared', 'info');
+}
+
+// Generate colors for multiple devices
+function generateDeviceColor(index) {
+    const colors = [
+        '#4a90e2', '#e74c3c', '#2ecc71', '#f39c12', 
+        '#9b59b6', '#1abc9c', '#34495e', '#e67e22',
+        '#8e44ad', '#16a085', '#2c3e50', '#d35400'
+    ];
+    return colors[index % colors.length];
+}
+
+function generateDeviceBackgroundColor(borderColor) {
+    // Convert border color to background color with transparency
+    const rgb = borderColor.match(/\d+/g);
+    if (rgb) {
+        return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.1)`;
+    }
+    return borderColor.replace('rgb', 'rgba').replace(')', ', 0.1)');
+}
