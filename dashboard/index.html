@@ -25,10 +25,52 @@
 =======
         <header>
             <h1><i class="fas fa-thermometer-half"></i> ESP32 Temperature Monitoring</h1>
-            <div class="connection-status" id="connection-status">
-                <i class="fas fa-circle"></i> Connecting...
+            <div class="header-controls">
+                <div class="connection-status" id="connection-status">
+                    <i class="fas fa-circle"></i> Connecting...
+                </div>
+                <button class="refresh-btn" id="refresh-btn" onclick="retryConnection()" title="Retry Connection">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="settings-btn" id="settings-btn" onclick="toggleSettings()" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
             </div>
         </header>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settings-panel">
+            <div class="settings-content">
+                <h3><i class="fas fa-cog"></i> Dashboard Settings</h3>
+                <div class="setting-item">
+                    <label for="refresh-interval">Auto Refresh Interval:</label>
+                    <select id="refresh-interval" onchange="updateRefreshInterval()">
+                        <option value="10">10 seconds</option>
+                        <option value="30" selected>30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                        <option value="0">Disabled</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="temperature-unit">Temperature Unit:</label>
+                    <select id="temperature-unit" onchange="updateTemperatureUnit()">
+                        <option value="celsius" selected>Celsius (°C)</option>
+                        <option value="fahrenheit">Fahrenheit (°F)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="theme-mode">Theme:</label>
+                    <select id="theme-mode" onchange="updateTheme()">
+                        <option value="light" selected>Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+                <button class="close-settings" onclick="toggleSettings()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
 
         <div class="dashboard-grid">
             <div class="card device-info">
@@ -49,6 +91,10 @@
                     <div class="info-item">
                         <label>Status:</label>
                         <span id="device-status" class="status-indicator">--</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Last Update:</label>
+                        <span id="last-update">--</span>
                     </div>
                 </div>
             </div>
@@ -77,11 +123,16 @@
 
             <div class="card chart-container">
                 <h2><i class="fas fa-chart-line"></i> Temperature History</h2>
-                <div class="chart-controls">
-                    <button class="time-btn active" data-period="1h">1H</button>
-                    <button class="time-btn" data-period="6h">6H</button>
-                    <button class="time-btn" data-period="24h">24H</button>
-                    <button class="time-btn" data-period="7d">7D</button>
+                <div class="chart-header">
+                    <div class="chart-controls">
+                        <button class="time-btn active" data-period="1h">1H</button>
+                        <button class="time-btn" data-period="6h">6H</button>
+                        <button class="time-btn" data-period="24h">24H</button>
+                        <button class="time-btn" data-period="7d">7D</button>
+                    </div>
+                    <button class="export-btn" onclick="exportData()" title="Export Data as CSV">
+                        <i class="fas fa-download"></i> Export
+                    </button>
                 </div>
                 <canvas id="temp-chart"></canvas>
             </div>

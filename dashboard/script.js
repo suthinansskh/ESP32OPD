@@ -70,6 +70,9 @@ let allDevices = {};
 let temperatureData = [];
 let chart = null;
 let currentPeriod = '1h';
+let refreshInterval = null;
+let refreshIntervalTime = 30; // seconds
+let temperatureUnit = 'celsius';
 
 // DOM elements
 const connectionStatus = document.getElementById('connection-status');
@@ -77,6 +80,7 @@ const deviceIdElement = document.getElementById('device-id');
 const deviceZoneElement = document.getElementById('device-zone');
 const lastSeenElement = document.getElementById('last-seen');
 const deviceStatusElement = document.getElementById('device-status');
+const lastUpdateElement = document.getElementById('last-update');
 const temperatureElement = document.getElementById('temperature');
 const minTempElement = document.getElementById('min-temp');
 const maxTempElement = document.getElementById('max-temp');
@@ -88,6 +92,29 @@ function initDashboard() {
     initChart();
     setupEventListeners();
     listenToDevices();
+    startAutoRefresh();
+}
+
+// Start auto-refresh timer
+function startAutoRefresh() {
+    stopAutoRefresh(); // Clear any existing interval
+    
+    if (refreshIntervalTime > 0) {
+        refreshInterval = setInterval(() => {
+            if (currentDevice && allDevices[currentDevice]) {
+                updateCurrentDeviceInfo();
+                updateTemperatureData();
+            }
+        }, refreshIntervalTime * 1000);
+    }
+}
+
+// Stop auto-refresh
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
 }
 
 // Initialize Chart.js
@@ -241,7 +268,17 @@ function setupEventListeners() {
 
 // Listen to Firebase devices
 function listenToDevices() {
-    updateConnectionStatus('connected');
+    updateConnectionStatus('connecting');
+    
+    // Test Firebase connection first
+    database.ref('.info/connected').on('value', (snapshot) => {
+        const connected = snapshot.val();
+        if (connected) {
+            updateConnectionStatus('connected');
+        } else {
+            updateConnectionStatus('disconnected');
+        }
+    });
     
     database.ref('devices').on('value', (snapshot) => {
         const devices = snapshot.val();
@@ -261,7 +298,8 @@ function listenToDevices() {
         }
     }, (error) => {
         console.error('Firebase error:', error);
-        updateConnectionStatus('disconnected');
+        updateConnectionStatus('error');
+        showErrorMessage('Failed to connect to Firebase: ' + error.message);
     });
 }
 
@@ -270,10 +308,21 @@ function updateConnectionStatus(status) {
     const statusElement = connectionStatus;
     statusElement.className = `connection-status ${status}`;
     
-    if (status === 'connected') {
-        statusElement.innerHTML = '<i class="fas fa-circle"></i> Connected';
-    } else {
-        statusElement.innerHTML = '<i class="fas fa-circle"></i> Disconnected';
+    switch (status) {
+        case 'connected':
+            statusElement.innerHTML = '<i class="fas fa-circle"></i> Connected';
+            break;
+        case 'disconnected':
+            statusElement.innerHTML = '<i class="fas fa-circle"></i> Disconnected';
+            break;
+        case 'connecting':
+            statusElement.innerHTML = '<i class="fas fa-circle"></i> Connecting...';
+            break;
+        case 'error':
+            statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Connection Error';
+            break;
+        default:
+            statusElement.innerHTML = '<i class="fas fa-circle"></i> Unknown';
     }
 }
 
@@ -293,7 +342,8 @@ function updateDevicesList() {
             const logKeys = Object.keys(device.logs).sort();
             if (logKeys.length > 0) {
                 const latestLog = device.logs[logKeys[logKeys.length - 1]];
-                latestTemp = latestLog.toFixed(1) + '°C';
+                const converted = convertTemperature(latestLog);
+                latestTemp = converted.toFixed(1) + getTemperatureUnit();
             }
         }
         
@@ -362,7 +412,11 @@ function updateTemperatureData() {
     
     // Update current temperature (latest reading)
     const latestTemp = logEntries[logEntries.length - 1].temperature;
-    temperatureElement.textContent = latestTemp.toFixed(1);
+    const convertedTemp = convertTemperature(latestTemp);
+    temperatureElement.textContent = convertedTemp.toFixed(1);
+    
+    // Update temperature unit in display
+    document.querySelector('.temp-unit').textContent = getTemperatureUnit();
     
     // Calculate statistics for today
     const now = new Date();
@@ -375,13 +429,17 @@ function updateTemperatureData() {
         const maxTemp = Math.max(...temperatures);
         const avgTemp = temperatures.reduce((sum, temp) => sum + temp, 0) / temperatures.length;
         
-        minTempElement.textContent = minTemp.toFixed(1) + '°C';
-        maxTempElement.textContent = maxTemp.toFixed(1) + '°C';
-        avgTempElement.textContent = avgTemp.toFixed(1) + '°C';
+        const unit = getTemperatureUnit();
+        minTempElement.textContent = convertTemperature(minTemp).toFixed(1) + unit;
+        maxTempElement.textContent = convertTemperature(maxTemp).toFixed(1) + unit;
+        avgTempElement.textContent = convertTemperature(avgTemp).toFixed(1) + unit;
     }
     
     // Update chart
     updateChartData();
+    
+    // Update last update timestamp
+    lastUpdateElement.textContent = new Date().toLocaleTimeString();
 }
 
 // Update chart data based on selected time period
@@ -457,6 +515,127 @@ function formatTimeAgo(date) {
         const days = Math.floor(diffInSeconds / 86400);
         return `${days} day${days !== 1 ? 's' : ''} ago`;
     }
+}
+
+// Show error message
+function showErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle"></i>
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Insert at the top of the container
+    const container = document.querySelector('.container');
+    container.insertBefore(errorDiv, container.firstChild);
+    
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+        if (errorDiv.parentElement) {
+            errorDiv.remove();
+        }
+    }, 10000);
+}
+
+// Add loading indicator to temperature display
+function showLoadingIndicator() {
+    temperatureElement.innerHTML = '<div class="loading"></div>';
+}
+
+// Retry Firebase connection
+function retryConnection() {
+    console.log('Retrying Firebase connection...');
+    updateConnectionStatus('connecting');
+    
+    // Re-initialize Firebase listeners
+    setTimeout(() => {
+        listenToDevices();
+    }, 2000);
+}
+
+// Export temperature data as CSV
+function exportData() {
+    if (!currentDevice || !allDevices[currentDevice] || !allDevices[currentDevice].logs) {
+        showErrorMessage('No data available to export');
+        return;
+    }
+    
+    const logs = allDevices[currentDevice].logs;
+    const logEntries = Object.entries(logs).map(([timestamp, temp]) => ({
+        timestamp: parseInt(timestamp),
+        temperature: temp,
+        date: new Date(parseInt(timestamp)).toISOString()
+    })).sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Create CSV content
+    let csvContent = 'Timestamp,Date,Temperature (°C),Device ID,Zone\n';
+    logEntries.forEach(entry => {
+        csvContent += `${entry.timestamp},${entry.date},${entry.temperature},${currentDevice},${allDevices[currentDevice].zone || 'Unknown'}\n`;
+    });
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const now = new Date();
+    const filename = `temperature_data_${currentDevice}_${now.toISOString().split('T')[0]}.csv`;
+    
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Settings functions
+function toggleSettings() {
+    const panel = document.getElementById('settings-panel');
+    panel.classList.toggle('show');
+}
+
+function updateRefreshInterval() {
+    const select = document.getElementById('refresh-interval');
+    refreshIntervalTime = parseInt(select.value);
+    startAutoRefresh();
+}
+
+function updateTemperatureUnit() {
+    const select = document.getElementById('temperature-unit');
+    temperatureUnit = select.value;
+    
+    // Update all temperature displays
+    if (currentDevice && allDevices[currentDevice]) {
+        updateTemperatureData();
+        updateDevicesList();
+    }
+}
+
+function updateTheme() {
+    const select = document.getElementById('theme-mode');
+    const theme = select.value;
+    
+    if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+    } else {
+        document.body.classList.remove('dark-theme');
+    }
+}
+
+// Temperature conversion utility
+function convertTemperature(celsius) {
+    if (temperatureUnit === 'fahrenheit') {
+        return (celsius * 9/5) + 32;
+    }
+    return celsius;
+}
+
+function getTemperatureUnit() {
+    return temperatureUnit === 'fahrenheit' ? '°F' : '°C';
 }
 
 // Initialize when page loads

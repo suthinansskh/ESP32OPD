@@ -96,6 +96,138 @@ header h1 {
     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
+.header-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.refresh-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.refresh-btn:hover {
+    background: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
+}
+
+.refresh-btn:active {
+    transform: translateY(0);
+}
+
+.refresh-btn i {
+    font-size: 0.9rem;
+}
+
+.settings-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.settings-btn:hover {
+    background: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
+}
+
+.settings-btn i {
+    font-size: 0.9rem;
+}
+
+/* Settings Panel */
+.settings-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.settings-panel.show {
+    display: flex;
+}
+
+.settings-content {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.settings-content h3 {
+    margin-bottom: 24px;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.setting-item:last-of-type {
+    border-bottom: none;
+}
+
+.setting-item label {
+    font-weight: 500;
+    color: #374151;
+}
+
+.setting-item select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    min-width: 150px;
+}
+
+.close-settings {
+    width: 100%;
+    padding: 12px 24px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    margin-top: 16px;
+    transition: background 0.2s ease;
+}
+
+.close-settings:hover {
+    background: #5a67d8;
+}
+
 .connection-status {
     display: inline-flex;
     align-items: center;
@@ -113,6 +245,14 @@ header h1 {
 
 .connection-status.disconnected {
     background: rgba(239, 68, 68, 0.2);
+}
+
+.connection-status.connecting {
+    background: rgba(251, 191, 36, 0.2);
+}
+
+.connection-status.error {
+    background: rgba(239, 68, 68, 0.3);
 }
 
 .dashboard-grid {
@@ -246,8 +386,35 @@ header h1 {
 .chart-controls {
     display: flex;
     gap: 8px;
-    margin-bottom: 20px;
     justify-content: center;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.export-btn {
+    padding: 8px 16px;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.export-btn:hover {
+    background: #059669;
+    transform: translateY(-1px);
 }
 
 .time-btn {
@@ -321,8 +488,13 @@ header h1 {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+    
     .dashboard-grid {
         grid-template-columns: 1fr;
+        gap: 15px;
     }
     
     .chart-container {
@@ -333,6 +505,11 @@ header h1 {
         font-size: 2rem;
     }
     
+    .header-controls {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
     .temp-value {
         font-size: 2.5rem;
     }
@@ -340,6 +517,24 @@ header h1 {
     .temp-info {
         grid-template-columns: 1fr;
         gap: 8px;
+    }
+    
+    .chart-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    
+    .chart-controls {
+        justify-content: center;
+    }
+    
+    .export-btn {
+        align-self: center;
+    }
+    
+    .card {
+        padding: 20px;
     }
 }
 
@@ -358,4 +553,127 @@ header h1 {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 >>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
+}
+
+/* Error Message Styles */
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #dc2626;
+    font-weight: 500;
+}
+
+.error-message i:first-child {
+    font-size: 1.2rem;
+}
+
+.error-message button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #dc2626;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.error-message button:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Enhanced Loading Styles */
+.temp-value .loading {
+    margin: 0 auto;
+    width: 30px;
+    height: 30px;
+    border-width: 4px;
+}
+
+/* Pulse Animation for Connection Status */
+.connection-status.connecting i {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Dark Theme */
+.dark-theme {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.dark-theme .card {
+    background: #2d3748;
+    color: white;
+}
+
+.dark-theme .card h2 {
+    color: #e2e8f0;
+}
+
+.dark-theme .info-item {
+    border-bottom-color: #4a5568;
+}
+
+.dark-theme .info-item label {
+    color: #a0aec0;
+}
+
+.dark-theme .info-item span {
+    color: #e2e8f0;
+}
+
+.dark-theme .temp-stat {
+    background: #4a5568;
+    color: white;
+}
+
+.dark-theme .temp-stat label {
+    color: #a0aec0;
+}
+
+.dark-theme .device-item {
+    background: #4a5568;
+    color: white;
+}
+
+.dark-theme .device-item:hover {
+    background: #5a6572;
+}
+
+.dark-theme .device-zone {
+    color: #a0aec0;
+}
+
+.dark-theme .settings-content {
+    background: #2d3748;
+    color: white;
+}
+
+.dark-theme .settings-content h3 {
+    color: #e2e8f0;
+}
+
+.dark-theme .setting-item {
+    border-bottom-color: #4a5568;
+}
+
+.dark-theme .setting-item label {
+    color: #e2e8f0;
+}
+
+.dark-theme .setting-item select {
+    background: #4a5568;
+    color: white;
+    border-color: #5a6572;
 }
