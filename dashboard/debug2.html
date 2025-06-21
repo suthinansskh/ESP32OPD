@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Data Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .data { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        pre { white-space: pre-wrap; word-break: break-all; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Firebase Data Debug</h1>
+    <button onclick="fetchData()">Fetch Firebase Data</button>
+    <div id="output"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDu96XHQVxo46thtvzVgPGvNitQX7NroWA",
+            authDomain: "opdesp32.firebaseapp.com",
+            databaseURL: "https://opdesp32-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "opdesp32",
+            storageBucket: "opdesp32.appspot.com",
+            messagingSenderId: "1082565443865",
+            appId: "1:1082565443865:web:8d64cf638398724a993a84"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        function fetchData() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>Fetching data...</p>';
+
+            database.ref('/').once('value')
+                .then((snapshot) => {
+                    const data = snapshot.val();
+                    console.log('Raw Firebase data:', data);
+                    
+                    let html = '<div class="data"><h3>Raw Firebase Data:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+                    html += '<div class="data"><h3>Root Keys:</h3><pre>' + Object.keys(data || {}).join(', ') + '</pre></div>';
+                    
+                    const opdDevices = Object.keys(data || {}).filter(key => key.startsWith('OPD-'));
+                    html += '<div class="data"><h3>OPD Devices Found:</h3><pre>' + opdDevices.join(', ') + '</pre></div>';
+
+                    // Check each OPD device
+                    opdDevices.forEach(key => {
+                        html += '<div class="data"><h3>Device: ' + key + '</h3><pre>' + JSON.stringify(data[key], null, 2) + '</pre></div>';
+                    });
+                    
+                    output.innerHTML = html;
+                })
+                .catch((error) => {
+                    output.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+                    console.error('Firebase error:', error);
+                });
+        }
+
+        // Auto-fetch on load
+        window.onload = fetchData;
+    </script>
+</body>
+</html>

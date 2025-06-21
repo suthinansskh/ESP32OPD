@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Device List Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .device { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Simple Device List Test</h1>
+    <button onclick="loadDevices()">Load Devices</button>
+    <div id="devices"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDu96XHQVxo46thtvzVgPGvNitQX7NroWA",
+            authDomain: "opdesp32.firebaseapp.com",
+            databaseURL: "https://opdesp32-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "opdesp32",
+            storageBucket: "opdesp32.appspot.com",
+            messagingSenderId: "1082565443865",
+            appId: "1:1082565443865:web:8d64cf638398724a993a84"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        function loadDevices() {
+            console.log('Loading devices...');
+            
+            database.ref('/').once('value')
+                .then((snapshot) => {
+                    const data = snapshot.val();
+                    console.log('Raw data:', data);
+                    
+                    const devicesDiv = document.getElementById('devices');
+                    devicesDiv.innerHTML = '';
+                    
+                    if (!data) {
+                        devicesDiv.innerHTML = '<p>No data found</p>';
+                        return;
+                    }
+                    
+                    const keys = Object.keys(data);
+                    console.log('All keys:', keys);
+                    
+                    const opdDevices = keys.filter(key => key.startsWith('OPD-'));
+                    console.log('OPD devices found:', opdDevices);
+                    
+                    if (opdDevices.length === 0) {
+                        devicesDiv.innerHTML = '<p>No OPD devices found</p>';
+                        return;
+                    }
+                    
+                    opdDevices.forEach(deviceId => {
+                        const deviceData = data[deviceId];
+                        console.log(`Device ${deviceId}:`, deviceData);
+                        
+                        const deviceDiv = document.createElement('div');
+                        deviceDiv.className = 'device';
+                        
+                        let tempInfo = 'No temperature data';
+                        if (deviceData && deviceData.logs) {
+                            const logKeys = Object.keys(deviceData.logs);
+                            tempInfo = `${logKeys.length} temperature readings`;
+                            if (logKeys.length > 0) {
+                                const latestKey = logKeys.sort()[logKeys.length - 1];
+                                const latestTemp = deviceData.logs[latestKey];
+                                tempInfo += `, latest: ${latestTemp}°C`;
+                            }
+                        } else if (deviceData) {
+                            // Check for direct temperature readings
+                            const numericKeys = Object.keys(deviceData).filter(k => !isNaN(k));
+                            if (numericKeys.length > 0) {
+                                tempInfo = `${numericKeys.length} direct readings`;
+                            }
+                        }
+                        
+                        deviceDiv.innerHTML = `
+                            <h3>${deviceId}</h3>
+                            <p>Zone: ${deviceData?.zone || 'Unknown'}</p>
+                            <p>Temperature: ${tempInfo}</p>
+                        `;
+                        
+                        devicesDiv.appendChild(deviceDiv);
+                    });
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    document.getElementById('devices').innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+                });
+        }
+
+        // Auto-load on page load
+        window.onload = loadDevices;
+    </script>
+</body>
+</html>

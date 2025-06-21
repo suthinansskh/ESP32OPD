@@ -33,20 +33,40 @@ const settings = {
 };
 
 // DOM elements
-const connectionStatus = document.getElementById('connection-status');
-const deviceIdElement = document.getElementById('device-id');
-const deviceZoneElement = document.getElementById('device-zone');
-const lastSeenElement = document.getElementById('last-seen');
-const deviceStatusElement = document.getElementById('device-status');
-const lastUpdateElement = document.getElementById('last-update');
-const temperatureElement = document.getElementById('temperature');
-const minTempElement = document.getElementById('min-temp');
-const maxTempElement = document.getElementById('max-temp');
-const avgTempElement = document.getElementById('avg-temp');
-const devicesContainer = document.getElementById('devices-container');
+let connectionStatus, deviceIdElement, deviceZoneElement, lastSeenElement, deviceStatusElement, lastUpdateElement, temperatureElement, minTempElement, maxTempElement, avgTempElement, devicesContainer;
+
+// Initialize DOM elements
+function initDOMElements() {
+    connectionStatus = document.getElementById('connection-status');
+    deviceIdElement = document.getElementById('device-id');
+    deviceZoneElement = document.getElementById('device-zone');
+    lastSeenElement = document.getElementById('last-seen');
+    deviceStatusElement = document.getElementById('device-status');
+    lastUpdateElement = document.getElementById('last-update');
+    temperatureElement = document.getElementById('temperature');
+    minTempElement = document.getElementById('min-temp');
+    maxTempElement = document.getElementById('max-temp');
+    avgTempElement = document.getElementById('avg-temp');
+    devicesContainer = document.getElementById('devices-container');
+    
+    console.log('DOM elements initialized:', {
+        connectionStatus: !!connectionStatus,
+        deviceIdElement: !!deviceIdElement,
+        deviceZoneElement: !!deviceZoneElement,
+        lastSeenElement: !!lastSeenElement,
+        deviceStatusElement: !!deviceStatusElement,
+        lastUpdateElement: !!lastUpdateElement,
+        temperatureElement: !!temperatureElement,
+        minTempElement: !!minTempElement,
+        maxTempElement: !!maxTempElement,
+        avgTempElement: !!avgTempElement,
+        devicesContainer: !!devicesContainer
+    });
+}
 
 // Initialize the dashboard
 function initDashboard() {
+    initDOMElements();
     initChart();
     setupEventListeners();
     
@@ -219,9 +239,12 @@ function listenToDevices() {
             allDevices = parseDeviceData(data);
             
             if (Object.keys(allDevices).length > 0) {
+                console.log('Found devices:', Object.keys(allDevices));
+                
                 // If no current device selected, select the first one
                 if (!currentDevice) {
                     currentDevice = Object.keys(allDevices)[0];
+                    console.log('Auto-selected device:', currentDevice);
                 }
                 
                 updateDevicesList();
@@ -229,6 +252,7 @@ function listenToDevices() {
                 updateTemperatureData();
                 updateLastRefreshTime();
             } else {
+                console.log('No devices found in parsed data');
                 showNoDevicesMessage();
             }
         } else {
@@ -245,35 +269,84 @@ function listenToDevices() {
 function parseDeviceData(data) {
     const devices = {};
     
+    console.log('Raw Firebase data:', data);
+    console.log('Available keys:', Object.keys(data || {}));
+    
     // Handle direct device format (OPD-01, OPD-04, etc.)
-    Object.keys(data).forEach(key => {
-        if (key.startsWith('OPD-') && data[key].logs) {
-            devices[key] = {
-                zone: data[key].zone || data.zone || 'Unknown Zone',
-                lastSeen: data[key].lastSeen || data.lastSeen,
-                logs: {}
-            };
+    Object.keys(data || {}).forEach(key => {
+        console.log(`Checking key: ${key}`, data[key]);
+        
+        if (key.startsWith('OPD-')) {
+            console.log(`Found OPD device: ${key}`);
             
-            // Convert timestamp keys to proper timestamps
-            Object.keys(data[key].logs).forEach(timestamp => {
-                // If timestamp is relative, convert to absolute
-                let absoluteTimestamp = parseInt(timestamp);
-                if (absoluteTimestamp < 1000000000000) { // If it's not already a proper timestamp
-                    // Assume it's relative to device start time or use current time
-                    absoluteTimestamp = Date.now() - (Object.keys(data[key].logs).length * 10000) + (parseInt(timestamp) * 10);
+            // Check if device data exists and is an object
+            if (data[key] && typeof data[key] === 'object') {
+                devices[key] = {
+                    zone: data[key].zone || 'Unknown Zone',
+                    lastSeen: data[key].lastSeen || Date.now(),
+                    logs: {}
+                };
+                
+                // Handle logs if they exist
+                if (data[key].logs && typeof data[key].logs === 'object') {
+                    console.log(`Processing logs for ${key}:`, data[key].logs);
+                    
+                    Object.keys(data[key].logs).forEach(timestamp => {
+                        // If timestamp is relative, convert to absolute
+                        let absoluteTimestamp = parseInt(timestamp);
+                        if (absoluteTimestamp < 1000000000000) { // If it's not already a proper timestamp
+                            // Assume it's relative to device start time or use current time
+                            absoluteTimestamp = Date.now() - (Object.keys(data[key].logs).length * 10000) + (parseInt(timestamp) * 10);
+                        }
+                        devices[key].logs[absoluteTimestamp] = data[key].logs[timestamp];
+                    });
+                } else {
+                    // Handle case where temperature data might be at device level
+                    // Look for numeric keys or temperature values
+                    console.log(`No logs found for ${key}, checking for direct temperature data`);
+                    
+                    // Check for numeric timestamps or direct temperature readings
+                    Object.keys(data[key]).forEach(subKey => {
+                        if (!isNaN(subKey)) {
+                            // This is likely a timestamp
+                            const timestamp = parseInt(subKey);
+                            const value = data[key][subKey];
+                            
+                            // Convert relative timestamp to absolute if needed
+                            let absoluteTimestamp = timestamp;
+                            if (timestamp < 1000000000000) {
+                                absoluteTimestamp = Date.now() - (Object.keys(data[key]).length * 10000) + (timestamp * 10);
+                            }
+                            
+                            devices[key].logs[absoluteTimestamp] = value;
+                        } else if (subKey === 'temperature') {
+                            // Direct temperature reading
+                            devices[key].logs[Date.now()] = data[key][subKey];
+                        }
+                    });
+                    
+                    // If still no logs, create a dummy entry with current timestamp
+                    if (Object.keys(devices[key].logs).length === 0) {
+                        console.log(`No temperature data found for ${key}, creating placeholder`);
+                        devices[key].logs[Date.now()] = 0; // Placeholder
+                    }
                 }
-                devices[key].logs[absoluteTimestamp] = data[key].logs[timestamp];
-            });
+            }
         }
     });
     
     // Also check for devices under 'devices' key (standard format)
     if (data.devices) {
+        console.log('Found devices under /devices path');
         Object.keys(data.devices).forEach(deviceId => {
-            devices[deviceId] = data.devices[deviceId];
+            if (!devices[deviceId]) { // Don't override already parsed devices
+                devices[deviceId] = data.devices[deviceId];
+            }
         });
     }
     
+    console.log('Parsed devices:', devices);
+    console.log('Final device count:', Object.keys(devices).length);
     return devices;
 }
 
@@ -302,21 +375,43 @@ function updateConnectionStatus(status) {
 
 // Update devices list
 function updateDevicesList() {
+    console.log('Updating devices list. All devices:', allDevices);
+    
+    if (!devicesContainer) {
+        console.error('devicesContainer not found');
+        return;
+    }
+    
     devicesContainer.innerHTML = '';
     
-    Object.keys(allDevices).forEach(deviceId => {
+    const deviceKeys = Object.keys(allDevices);
+    console.log('Device keys to display:', deviceKeys);
+    
+    if (deviceKeys.length === 0) {
+        devicesContainer.innerHTML = '<div class="device-item">No devices found</div>';
+        return;
+    }
+    
+    deviceKeys.forEach(deviceId => {
         const device = allDevices[deviceId];
+        console.log(`Rendering device ${deviceId}:`, device);
+        
         const deviceElement = document.createElement('div');
         deviceElement.className = `device-item ${deviceId === currentDevice ? 'active' : ''}`;
         deviceElement.onclick = () => selectDevice(deviceId);
         
         // Get latest temperature
         let latestTemp = '--';
-        if (device.logs) {
-            const logKeys = Object.keys(device.logs).sort();
+        if (device && device.logs && Object.keys(device.logs).length > 0) {
+            const logKeys = Object.keys(device.logs).sort((a, b) => parseInt(b) - parseInt(a)); // Sort descending
+            console.log(`Device ${deviceId} log keys:`, logKeys);
+            
             if (logKeys.length > 0) {
-                const latestLog = device.logs[logKeys[logKeys.length - 1]];
-                latestTemp = convertTemperature(latestLog).toFixed(1) + getTemperatureUnit();
+                const latestLog = device.logs[logKeys[0]]; // Get the most recent
+                console.log(`Latest log for ${deviceId}:`, latestLog);
+                if (!isNaN(latestLog) && latestLog !== null && latestLog !== undefined) {
+                    latestTemp = convertTemperature(latestLog).toFixed(1) + getTemperatureUnit();
+                }
             }
         }
         
@@ -329,7 +424,10 @@ function updateDevicesList() {
         `;
         
         devicesContainer.appendChild(deviceElement);
+        console.log(`Added device element for ${deviceId}`);
     });
+    
+    console.log('Device list update complete. Container children:', devicesContainer.children.length);
 }
 
 // Select a device
@@ -342,26 +440,37 @@ function selectDevice(deviceId) {
 
 // Update current device information
 function updateCurrentDeviceInfo() {
-    if (!currentDevice || !allDevices[currentDevice]) return;
+    console.log('Updating current device info. Current device:', currentDevice);
+    console.log('Available devices:', Object.keys(allDevices));
+    
+    if (!currentDevice || !allDevices[currentDevice]) {
+        console.log('No current device or device not found in allDevices');
+        return;
+    }
     
     const device = allDevices[currentDevice];
+    console.log('Current device data:', device);
     
-    deviceIdElement.textContent = currentDevice;
-    deviceZoneElement.textContent = device.zone || 'Unknown';
+    if (deviceIdElement) deviceIdElement.textContent = currentDevice;
+    if (deviceZoneElement) deviceZoneElement.textContent = device.zone || 'Unknown';
     
     // Update last seen
     if (device.lastSeen) {
         const lastSeen = new Date(device.lastSeen);
-        lastSeenElement.textContent = formatTimeAgo(lastSeen);
+        if (lastSeenElement) lastSeenElement.textContent = formatTimeAgo(lastSeen);
         
         // Determine if device is online (last seen within 2 minutes)
         const isOnline = Date.now() - lastSeen.getTime() < 2 * 60 * 1000;
-        deviceStatusElement.textContent = isOnline ? 'Online' : 'Offline';
-        deviceStatusElement.className = `status-indicator ${isOnline ? 'online' : 'offline'}`;
+        if (deviceStatusElement) {
+            deviceStatusElement.textContent = isOnline ? 'Online' : 'Offline';
+            deviceStatusElement.className = `status-indicator ${isOnline ? 'online' : 'offline'}`;
+        }
     } else {
-        lastSeenElement.textContent = 'Never';
-        deviceStatusElement.textContent = 'Unknown';
-        deviceStatusElement.className = 'status-indicator offline';
+        if (lastSeenElement) lastSeenElement.textContent = 'Never';
+        if (deviceStatusElement) {
+            deviceStatusElement.textContent = 'Unknown';
+            deviceStatusElement.className = 'status-indicator offline';
+        }
     }
 }
 

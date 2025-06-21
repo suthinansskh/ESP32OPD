@@ -83,22 +83,40 @@
         }
 
         function testPermissions() {
-            // Test read permissions
-            database.ref('devices').once('value', (snapshot) => {
+            // Test read permissions at root level (where OPD devices are)
+            database.ref('/').once('value', (snapshot) => {
                 addResult('✅ Database read permission OK', 'success');
                 
                 const data = snapshot.val();
                 if (data) {
-                    const deviceCount = Object.keys(data).length;
-                    addResult(`📱 Found ${deviceCount} device(s) in database`, 'success');
+                    const allKeys = Object.keys(data);
+                    const deviceKeys = allKeys.filter(key => key.startsWith('OPD-'));
                     
-                    Object.keys(data).forEach(deviceId => {
+                    addResult(`📱 Found ${deviceKeys.length} OPD device(s) in database`, 'success');
+                    addResult(`🔍 All root keys: ${allKeys.join(', ')}`, 'info');
+                    
+                    deviceKeys.forEach(deviceId => {
                         const device = data[deviceId];
                         const logCount = device.logs ? Object.keys(device.logs).length : 0;
                         addResult(`Device: ${deviceId} | Zone: ${device.zone || 'Unknown'} | Logs: ${logCount}`, 'info');
                     });
+                    
+                    if (deviceKeys.length === 0) {
+                        addResult('⚠️ No OPD devices found. Looking for legacy devices under /devices...', 'error');
+                        
+                        // Also check /devices path for legacy format
+                        if (data.devices) {
+                            const legacyDevices = Object.keys(data.devices);
+                            addResult(`📱 Found ${legacyDevices.length} legacy device(s) under /devices`, 'success');
+                            legacyDevices.forEach(deviceId => {
+                                const device = data.devices[deviceId];
+                                const logCount = device.logs ? Object.keys(device.logs).length : 0;
+                                addResult(`Legacy Device: ${deviceId} | Zone: ${device.zone || 'Unknown'} | Logs: ${logCount}`, 'info');
+                            });
+                        }
+                    }
                 } else {
-                    addResult('⚠️ No device data found. ESP32 may not be sending data yet.', 'error');
+                    addResult('⚠️ No data found at root level. ESP32 may not be sending data yet.', 'error');
                 }
             }).catch((error) => {
                 addResult('❌ Database read failed: ' + error.message, 'error');
@@ -123,14 +141,38 @@
         function fetchDeviceData() {
             results.innerHTML = '<div class="status info">Fetching latest device data...</div>';
             
-            database.ref('devices').once('value', (snapshot) => {
+            database.ref('/').once('value', (snapshot) => {
                 const data = snapshot.val();
                 
                 if (data) {
-                    addResult('📊 Current Database Content:', 'info');
+                    addResult('📊 Current Database Content (Root Level):', 'info');
+                    
+                    // Show only OPD devices and relevant data
+                    const filteredData = {};
+                    Object.keys(data).forEach(key => {
+                        if (key.startsWith('OPD-') || key === 'devices') {
+                            filteredData[key] = data[key];
+                        }
+                    });
+                    
                     const pre = document.createElement('pre');
-                    pre.textContent = JSON.stringify(data, null, 2);
+                    pre.textContent = JSON.stringify(filteredData, null, 2);
                     results.appendChild(pre);
+                    
+                    if (Object.keys(filteredData).length === 0) {
+                        addResult('🔍 No OPD devices found. Showing all root keys instead:', 'info');
+                        const allKeys = Object.keys(data);
+                        addResult(`Available keys: ${allKeys.join(', ')}`, 'info');
+                    }
+                } else {
+                    addResult('📭 Database is empty. No ESP32 data found.', 'error');
+                    addResult('🔧 Check: Is your ESP32 powered on and connected to WiFi?', 'info');
+                    addResult('🔧 Check: Are Firebase rules allowing write access?', 'info');
+                }
+            }).catch((error) => {
+                addResult('❌ Failed to fetch data: ' + error.message, 'error');
+            });
+        }
                 } else {
                     addResult('📭 Database is empty. No ESP32 data found.', 'error');
                     addResult('🔧 Check: Is your ESP32 powered on and connected to WiFi?', 'info');
