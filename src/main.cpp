@@ -8,13 +8,18 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <time.h>
+#include <esp_task_wdt.h>
+#include <esp_system.h>
+#include <esp_heap_caps.h>
 
 // ESP32 memory optimization
 #include <esp_task_wdt.h>
 #include <esp_system.h>
-#if CONFIG_SPIRAM_SUPPORT
 #include <esp_heap_caps.h>
-#endif
+#define ENABLE_RTDB
+#include <Firebase_ESP_Client.h>
+#include "addons/TokenHelper.h"
+#include "addons/RTDBHelper.h"
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -25,15 +30,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define FIREBASE_HOST "https://opdesp32-default-rtdb.asia-southeast1.firebasedatabase.app/"
 #define FIREBASE_AUTH "AIzaSyDu96XHQVxo46thtvzVgPGvNitQX7NroWA"
 #define FIREBASE_DATABASE_SECRET "4BaURFRlzUbwiWp3dO1kciwxYjqUY9AaRrw3EQ6r"
-
-// Correct Firebase addon paths with explicit path
-#include "Firebase_ESP_Client.h"
-// Enable token generation
-#define ENABLE_RTDB
-// Include token helper before FirebaseData instantiation
-#include "addons/TokenHelper.h"
-// Include RTDB helper  
-#include "addons/RTDBHelper.h"
 
 // Firebase objects
 FirebaseData fbdo;         // Firebase Data object
