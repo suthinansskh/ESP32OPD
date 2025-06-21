@@ -9,6 +9,20 @@
 </head>
 <body>
     <div class="container">
+<<<<<<< HEAD
+        <h1>ESP32 Temperature Logs by Zone</h1>
+        <div class="zone-selector">
+            <label for="zone-select">Select Zone:</label>
+            <select id="zone-select">
+                <option value="All">All</option>
+                <option value="Building 1">Building 1</option>
+                <option value="Building 2">Building 2</option>
+                <option value="Building 3">Building 3</option>
+            </select>
+        </div>
+        <div id="devices-container">
+            <!-- Device cards will be dynamically inserted here -->
+=======
         <header>
             <h1><i class="fas fa-thermometer-half"></i> ESP32 Temperature Monitoring</h1>
             <div class="header-controls">
@@ -18,11 +32,45 @@
                 <button class="refresh-btn" id="refresh-btn" onclick="retryConnection()" title="Retry Connection">
                     <i class="fas fa-sync-alt"></i>
                 </button>
-                <button class="settings-btn" id="settings-btn" title="Dashboard Settings">
+                <button class="settings-btn" id="settings-btn" onclick="toggleSettings()" title="Settings">
                     <i class="fas fa-cog"></i>
                 </button>
             </div>
         </header>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settings-panel">
+            <div class="settings-content">
+                <h3><i class="fas fa-cog"></i> Dashboard Settings</h3>
+                <div class="setting-item">
+                    <label for="refresh-interval">Auto Refresh Interval:</label>
+                    <select id="refresh-interval" onchange="updateRefreshInterval()">
+                        <option value="10">10 seconds</option>
+                        <option value="30" selected>30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                        <option value="0">Disabled</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="temperature-unit">Temperature Unit:</label>
+                    <select id="temperature-unit" onchange="updateTemperatureUnit()">
+                        <option value="celsius" selected>Celsius (°C)</option>
+                        <option value="fahrenheit">Fahrenheit (°F)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="theme-mode">Theme:</label>
+                    <select id="theme-mode" onchange="updateTheme()">
+                        <option value="light" selected>Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+                <button class="close-settings" onclick="toggleSettings()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
 
         <div class="dashboard-grid">
             <div class="card device-info">
@@ -95,51 +143,7 @@
                     <!-- Devices will be populated here -->
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Settings Panel -->
-    <div class="settings-overlay" id="settings-overlay"></div>
-    <div class="settings-panel" id="settings-panel">
-        <div class="settings-header">
-            <h3><i class="fas fa-cog"></i> Dashboard Settings</h3>
-            <button class="close-settings" onclick="document.getElementById('settings-panel').classList.remove('open'); document.getElementById('settings-overlay').classList.remove('active');">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="settings-content">
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Dark Theme</div>
-                    <div class="setting-description">Toggle between light and dark themes</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="theme-toggle">
-                    <span class="toggle-switch"></span>
-                </label>
-            </div>
-            
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Temperature Unit</div>
-                    <div class="setting-description">Switch between Celsius and Fahrenheit</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="temp-unit-toggle">
-                    <span class="toggle-switch"></span>
-                </label>
-            </div>
-            
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Auto Refresh</div>
-                    <div class="setting-description">Automatically refresh data every 10 seconds</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="auto-refresh-toggle" checked>
-                    <span class="toggle-switch"></span>
-                </label>
-            </div>
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
         </div>
     </div>
 
