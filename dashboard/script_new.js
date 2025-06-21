@@ -418,28 +418,39 @@ function getLatestTemperature(device) {
 
 // Select a device
 function selectDevice(deviceId) {
+    console.log('Selecting device:', deviceId);
+    
+    // Validate device exists
+    if (!allDevices[deviceId]) {
+        console.error('Device not found:', deviceId);
+        return;
+    }
+    
     currentDevice = deviceId;
     
-    // Update device cards
+    // Update device cards visual state
     document.querySelectorAll('.device-card').forEach(card => {
         card.classList.remove('active');
     });
     
     // Find and activate the selected device card
     document.querySelectorAll('.device-card').forEach(card => {
-        const deviceName = card.querySelector('.device-name').textContent;
+        const deviceName = card.querySelector('.device-name')?.textContent;
         if (deviceName === deviceId) {
             card.classList.add('active');
         }
     });
     
-    // Update device details
+    // Update device details panel
     updateDeviceDetails(deviceId);
     
-    // Update chart
+    // Update chart display with selected device data
     updateChartDisplay();
     
-    console.log('Selected device:', deviceId);
+    // Add visual feedback
+    showNotification(`Device ${deviceId} selected for chart display`, 'success');
+    
+    console.log('Device selection completed:', deviceId);
 }
 
 // Update device details section
@@ -721,38 +732,50 @@ function updateChartDisplay() {
         // Show "Select a device" message
         if (chartDeviceName) {
             chartDeviceName.textContent = 'Select a device to view chart';
+            chartDeviceName.style.color = '#666';
         }
         if (chartLastUpdate) {
-            chartLastUpdate.textContent = '--';
+            chartLastUpdate.textContent = 'No device selected';
+            chartLastUpdate.style.color = '#666';
         }
         
-        // Clear chart
+        // Clear chart with placeholder message
         chart.data.labels = [];
         chart.data.datasets[0].data = [];
+        chart.data.datasets[0].label = 'Temperature (°C)';
         chart.update();
+        
+        console.log('Chart cleared - no device selected');
         return;
     }
     
     const device = allDevices[currentDevice];
     
-    // Update chart info
+    // Update chart info header
     if (chartDeviceName) {
-        chartDeviceName.textContent = `${currentDevice} (${device.zone})`;
+        chartDeviceName.textContent = `${currentDevice} (${device.zone || 'Unknown Zone'})`;
+        chartDeviceName.style.color = '#4a90e2';
     }
     if (chartLastUpdate) {
         chartLastUpdate.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+        chartLastUpdate.style.color = '#666';
     }
     
-    // Update chart data
+    // Update chart data for the selected device
     updateChartData();
+    
+    console.log(`Chart updated for device: ${currentDevice}`);
 }
 
 // Update chart data based on selected time period
 function updateChartData() {
     if (!currentDevice || !allDevices[currentDevice] || !allDevices[currentDevice].logs) {
+        // Clear chart when no device is selected or no data available
         chart.data.labels = [];
         chart.data.datasets[0].data = [];
+        chart.data.datasets[0].label = 'Temperature (°C)';
         chart.update();
+        console.log('Chart cleared - no data available');
         return;
     }
     
@@ -778,22 +801,42 @@ function updateChartData() {
             startTime = now - (60 * 60 * 1000);
     }
     
-    // Filter and sort data
+    // Filter and sort data with better error handling
     const filteredData = Object.entries(logs)
-        .map(([timestamp, temp]) => ({
-            x: parseInt(timestamp),
-            y: convertTemperature(temp)
-        }))
-        .filter(entry => entry.x >= startTime)
+        .map(([timestamp, temp]) => {
+            const parsedTimestamp = parseInt(timestamp);
+            const parsedTemp = parseFloat(temp);
+            
+            // Skip invalid data points
+            if (isNaN(parsedTimestamp) || isNaN(parsedTemp)) {
+                return null;
+            }
+            
+            return {
+                x: parsedTimestamp,
+                y: convertTemperature(parsedTemp)
+            };
+        })
+        .filter(entry => entry !== null && entry.x >= startTime)
         .sort((a, b) => a.x - b.x);
     
-    // Update chart
-    chart.data.labels = filteredData.map(entry => new Date(entry.x));
-    chart.data.datasets[0].data = filteredData;
-    chart.data.datasets[0].label = `Temperature (${getTemperatureUnit()})`;
-    chart.update();
+    // Update chart with validation
+    if (filteredData.length === 0) {
+        // Show empty state for selected time period
+        chart.data.labels = [];
+        chart.data.datasets[0].data = [];
+        chart.data.datasets[0].label = `No data for ${currentPeriod} period`;
+        console.log(`No data available for ${currentDevice} in ${currentPeriod} period`);
+    } else {
+        // Update with actual data
+        chart.data.labels = filteredData.map(entry => new Date(entry.x));
+        chart.data.datasets[0].data = filteredData;
+        chart.data.datasets[0].label = `${currentDevice} - Temperature (${getTemperatureUnit()})`;
+        console.log(`Updated chart with ${filteredData.length} data points for ${currentDevice} (${currentPeriod} period)`);
+    }
     
-    console.log(`Updated chart with ${filteredData.length} data points for ${currentPeriod}`);
+    // Update the chart
+    chart.update('none'); // Use 'none' for faster updates without animation
 }
 
 // Update connection status
