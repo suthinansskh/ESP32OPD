@@ -13,6 +13,9 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
+// Authentication flag
+let isAuthenticated = false;
+
 // Global variables
 let currentDevice = null;
 let allDevices = {};
@@ -46,9 +49,9 @@ const devicesContainer = document.getElementById('devices-container');
 function initDashboard() {
     initChart();
     setupEventListeners();
-    listenToDevices();
-    startAutoRefresh();
-    loadSettings();
+    
+    // Try to authenticate and then start listening
+    attemptAuthentication();
 }
 
 // Initialize Chart.js
@@ -158,6 +161,39 @@ function setupEventListeners() {
     if (autoRefreshToggle) {
         autoRefreshToggle.addEventListener('change', toggleAutoRefresh);
     }
+}
+
+// Attempt Firebase authentication
+function attemptAuthentication() {
+    updateConnectionStatus('connecting');
+    
+    // Check if Firebase Auth is available and try anonymous authentication
+    if (typeof firebase.auth === 'function') {
+        console.log('Attempting anonymous authentication...');
+        firebase.auth().signInAnonymously()
+            .then(() => {
+                console.log('Anonymous authentication successful');
+                isAuthenticated = true;
+                startDashboard();
+            })
+            .catch((error) => {
+                console.warn('Anonymous authentication failed:', error.message);
+                console.log('Proceeding without authentication...');
+                isAuthenticated = false;
+                startDashboard();
+            });
+    } else {
+        console.log('Firebase Auth not available, proceeding without authentication...');
+        isAuthenticated = false;
+        startDashboard();
+    }
+}
+
+// Start dashboard after authentication attempt
+function startDashboard() {
+    listenToDevices();
+    startAutoRefresh();
+    loadSettings();
 }
 
 // Listen to Firebase devices
