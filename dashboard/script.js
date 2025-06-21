@@ -210,20 +210,27 @@ function listenToDevices() {
         }
     });
     
-    database.ref('devices').on('value', (snapshot) => {
-        const devices = snapshot.val();
-        allDevices = devices || {};
+    // Listen to the root level since data structure is different
+    database.ref('/').on('value', (snapshot) => {
+        const data = snapshot.val();
         
-        if (Object.keys(allDevices).length > 0) {
-            // If no current device selected, select the first one
-            if (!currentDevice) {
-                currentDevice = Object.keys(allDevices)[0];
-            }
+        if (data) {
+            // Parse the data to match expected format
+            allDevices = parseDeviceData(data);
             
-            updateDevicesList();
-            updateCurrentDeviceInfo();
-            updateTemperatureData();
-            updateLastRefreshTime();
+            if (Object.keys(allDevices).length > 0) {
+                // If no current device selected, select the first one
+                if (!currentDevice) {
+                    currentDevice = Object.keys(allDevices)[0];
+                }
+                
+                updateDevicesList();
+                updateCurrentDeviceInfo();
+                updateTemperatureData();
+                updateLastRefreshTime();
+            } else {
+                showNoDevicesMessage();
+            }
         } else {
             showNoDevicesMessage();
         }
@@ -232,6 +239,42 @@ function listenToDevices() {
         updateConnectionStatus('error');
         showErrorMessage('Failed to connect to Firebase: ' + error.message);
     });
+}
+
+// Parse device data to handle different data structures
+function parseDeviceData(data) {
+    const devices = {};
+    
+    // Handle direct device format (OPD-01, OPD-04, etc.)
+    Object.keys(data).forEach(key => {
+        if (key.startsWith('OPD-') && data[key].logs) {
+            devices[key] = {
+                zone: data[key].zone || data.zone || 'Unknown Zone',
+                lastSeen: data[key].lastSeen || data.lastSeen,
+                logs: {}
+            };
+            
+            // Convert timestamp keys to proper timestamps
+            Object.keys(data[key].logs).forEach(timestamp => {
+                // If timestamp is relative, convert to absolute
+                let absoluteTimestamp = parseInt(timestamp);
+                if (absoluteTimestamp < 1000000000000) { // If it's not already a proper timestamp
+                    // Assume it's relative to device start time or use current time
+                    absoluteTimestamp = Date.now() - (Object.keys(data[key].logs).length * 10000) + (parseInt(timestamp) * 10);
+                }
+                devices[key].logs[absoluteTimestamp] = data[key].logs[timestamp];
+            });
+        }
+    });
+    
+    // Also check for devices under 'devices' key (standard format)
+    if (data.devices) {
+        Object.keys(data.devices).forEach(deviceId => {
+            devices[deviceId] = data.devices[deviceId];
+        });
+    }
+    
+    return devices;
 }
 
 // Update connection status

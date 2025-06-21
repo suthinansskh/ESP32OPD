@@ -209,43 +209,69 @@
             clearStatus();
             addStatus('🔍 Scanning for ESP32 devices...', 'info');
             
-            database.ref('devices').once('value', (snapshot) => {
-                const devices = snapshot.val();
+            database.ref('/').once('value', (snapshot) => {
+                const data = snapshot.val();
                 
-                if (devices && Object.keys(devices).length > 0) {
-                    allDevices = devices;
-                    const deviceCount = Object.keys(devices).length;
-                    addStatus(`✅ Found ${deviceCount} device(s)!`, 'success');
+                if (data) {
+                    // Parse devices from the root level data
+                    const devices = {};
                     
-                    // Populate device selector
-                    const select = document.getElementById('deviceSelect');
-                    select.innerHTML = '<option value="">-- Select a device --</option>';
-                    
-                    Object.keys(devices).forEach(deviceId => {
-                        const device = devices[deviceId];
-                        const option = document.createElement('option');
-                        option.value = deviceId;
-                        option.textContent = `${deviceId} (${device.zone || 'Unknown Zone'})`;
-                        select.appendChild(option);
+                    // Look for device patterns like OPD-01, OPD-04, etc.
+                    Object.keys(data).forEach(key => {
+                        if (key.startsWith('OPD-') && data[key].logs) {
+                            devices[key] = {
+                                zone: data[key].zone || data.zone || 'Unknown Zone',
+                                lastSeen: data[key].lastSeen || data.lastSeen,
+                                logs: data[key].logs
+                            };
+                        }
                     });
                     
-                    document.getElementById('deviceSelector').style.display = 'block';
-                    document.getElementById('loadAllBtn').disabled = false;
-                    document.getElementById('loadRecentBtn').disabled = false;
+                    // Also check for devices under 'devices' key (standard format)
+                    if (data.devices) {
+                        Object.keys(data.devices).forEach(deviceId => {
+                            devices[deviceId] = data.devices[deviceId];
+                        });
+                    }
                     
-                    // Show device info
-                    let deviceInfo = '<h3>📱 Available Devices:</h3><ul>';
-                    Object.keys(devices).forEach(deviceId => {
-                        const device = devices[deviceId];
-                        const logCount = device.logs ? Object.keys(device.logs).length : 0;
-                        const lastSeen = device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never';
-                        deviceInfo += `<li><strong>${deviceId}</strong> - Zone: ${device.zone || 'Unknown'} - Logs: ${logCount} - Last Seen: ${lastSeen}</li>`;
-                    });
-                    deviceInfo += '</ul>';
-                    document.getElementById('deviceInfo').innerHTML = deviceInfo;
-                    
+                    if (Object.keys(devices).length > 0) {
+                        allDevices = devices;
+                        const deviceCount = Object.keys(devices).length;
+                        addStatus(`✅ Found ${deviceCount} device(s)!`, 'success');
+                        
+                        // Populate device selector
+                        const select = document.getElementById('deviceSelect');
+                        select.innerHTML = '<option value="">-- Select a device --</option>';
+                        
+                        Object.keys(devices).forEach(deviceId => {
+                            const device = devices[deviceId];
+                            const option = document.createElement('option');
+                            option.value = deviceId;
+                            option.textContent = `${deviceId} (${device.zone || 'Unknown Zone'})`;
+                            select.appendChild(option);
+                        });
+                        
+                        document.getElementById('deviceSelector').style.display = 'block';
+                        document.getElementById('loadAllBtn').disabled = false;
+                        document.getElementById('loadRecentBtn').disabled = false;
+                        
+                        // Show device info
+                        let deviceInfo = '<h3>📱 Available Devices:</h3><ul>';
+                        Object.keys(devices).forEach(deviceId => {
+                            const device = devices[deviceId];
+                            const logCount = device.logs ? Object.keys(device.logs).length : 0;
+                            const lastSeen = device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never';
+                            deviceInfo += `<li><strong>${deviceId}</strong> - Zone: ${device.zone || 'Unknown'} - Logs: ${logCount} - Last Seen: ${lastSeen}</li>`;
+                        });
+                        deviceInfo += '</ul>';
+                        document.getElementById('deviceInfo').innerHTML = deviceInfo;
+                        
+                    } else {
+                        addStatus('❌ No devices found in database', 'error');
+                        addStatus('💡 Make sure your ESP32 is connected and Firebase rules allow read access', 'warning');
+                    }
                 } else {
-                    addStatus('❌ No devices found in database', 'error');
+                    addStatus('❌ No data found in database', 'error');
                     addStatus('💡 Make sure your ESP32 is connected and Firebase rules allow read access', 'warning');
                 }
             }).catch((error) => {
@@ -292,11 +318,25 @@
             }
 
             const logs = device.logs;
-            let entries = Object.entries(logs).map(([timestamp, temp]) => ({
-                timestamp: parseInt(timestamp),
-                temperature: temp,
-                date: new Date(parseInt(timestamp))
-            }));
+            let entries = Object.entries(logs).map(([timestamp, temp]) => {
+                let absoluteTimestamp = parseInt(timestamp);
+                
+                // Convert relative timestamps to absolute timestamps
+                if (absoluteTimestamp < 1000000000000) { // If it's not already a proper timestamp
+                    // Use the device's lastSeen as reference point and work backwards
+                    const baseTime = device.lastSeen || Date.now();
+                    const totalEntries = Object.keys(logs).length;
+                    const entryIndex = Object.keys(logs).indexOf(timestamp);
+                    // Assume 10 second intervals between readings
+                    absoluteTimestamp = baseTime - ((totalEntries - entryIndex - 1) * 10000);
+                }
+                
+                return {
+                    timestamp: absoluteTimestamp,
+                    temperature: temp,
+                    date: new Date(absoluteTimestamp)
+                };
+            });
 
             // Filter for recent data if requested (last 24 hours)
             if (recentOnly) {
