@@ -44,21 +44,113 @@ const devicesContainer = document.getElementById('devices-container');
 
 // Initialize the dashboard
 function initDashboard() {
+    const devicesContainer = document.getElementById('devices-container');
+    const zoneSelect = document.getElementById('zone-select');
+
+    // Create device cards and charts
+    DEVICE_CONFIG.forEach(device => {
+        const card = createDeviceCard(device);
+        devicesContainer.appendChild(card);
+        initChart(device.id);
+    });
+
+    // Handle zone selection
+    zoneSelect.addEventListener('change', (e) => {
+        const selectedZone = e.target.value;
+        filterDevices(selectedZone);
+    });
+
+    // Start real-time updates
+    startRealtimeUpdates();
+}
+
+function createDeviceCard(device) {
+    const card = document.createElement('div');
+    card.className = 'device-card';
+    card.setAttribute('data-zone', device.zone);
+    card.innerHTML = `
+        <h2>Device: ${device.id} (${device.zone})</h2>
+        <div class="chart-container">
+            <canvas id="chart-${device.id}"></canvas>
+        </div>
+    `;
+    return card;
+}
+
+function initChart(deviceId) {
+    const ctx = document.getElementById(`chart-${deviceId}`).getContext('2d');
+    const chart = new Chart(ctx, {
+=======
+// Global variables
+let currentDevice = null;
+let allDevices = {};
+let temperatureData = [];
+let chart = null;
+let currentPeriod = '1h';
+let refreshInterval = null;
+let refreshIntervalTime = 30; // seconds
+let temperatureUnit = 'celsius';
+
+// DOM elements
+const connectionStatus = document.getElementById('connection-status');
+const deviceIdElement = document.getElementById('device-id');
+const deviceZoneElement = document.getElementById('device-zone');
+const lastSeenElement = document.getElementById('last-seen');
+const deviceStatusElement = document.getElementById('device-status');
+const lastUpdateElement = document.getElementById('last-update');
+const temperatureElement = document.getElementById('temperature');
+const minTempElement = document.getElementById('min-temp');
+const maxTempElement = document.getElementById('max-temp');
+const avgTempElement = document.getElementById('avg-temp');
+const devicesContainer = document.getElementById('devices-container');
+
+// Initialize the dashboard
+function initDashboard() {
     initChart();
     setupEventListeners();
     listenToDevices();
     startAutoRefresh();
-    loadSettings();
+}
+
+// Start auto-refresh timer
+function startAutoRefresh() {
+    stopAutoRefresh(); // Clear any existing interval
+    
+    if (refreshIntervalTime > 0) {
+        refreshInterval = setInterval(() => {
+            if (currentDevice && allDevices[currentDevice]) {
+                updateCurrentDeviceInfo();
+                updateTemperatureData();
+            }
+        }, refreshIntervalTime * 1000);
+    }
+}
+
+// Stop auto-refresh
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
 }
 
 // Initialize Chart.js
 function initChart() {
     const ctx = document.getElementById('temp-chart').getContext('2d');
     chart = new Chart(ctx, {
+>>>>>>> 4773087 (Refactor dashboard script to improve structure and enhance temperature data handling)
         type: 'line',
         data: {
             labels: [],
             datasets: [{
+<<<<<<< HEAD
+                label: 'Temperature',
+                data: [],
+                borderColor: '#4f46e5',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: false
+=======
                 label: 'Temperature (°C)',
                 data: [],
                 borderColor: '#667eea',
@@ -68,11 +160,79 @@ function initChart() {
                 tension: 0.4,
                 pointRadius: 3,
                 pointHoverRadius: 6,
+>>>>>>> 4773087 (Refactor dashboard script to improve structure and enhance temperature data handling)
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+<<<<<<< HEAD
+            scales: {
+                y: {
+                    min: 20,
+                    max: 40,
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Time'
+                    }
+                }
+            }
+        }
+    });
+    chartConfigs.set(deviceId, chart);
+}
+
+function filterDevices(zone) {
+    const cards = document.querySelectorAll('.device-card');
+    cards.forEach(card => {
+        if (zone === 'All' || card.getAttribute('data-zone') === zone) {
+            card.classList.remove('hidden');
+        } else {
+            card.classList.add('hidden');
+        }
+    });
+}
+
+function startRealtimeUpdates() {
+    DEVICE_CONFIG.forEach(device => {
+        const deviceRef = database.ref(`devices/${device.id}/logs`);
+        deviceRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                updateDeviceData(device.id, data);
+            }
+        });
+    });
+}
+
+function updateDeviceData(deviceId, data) {
+    const chart = chartConfigs.get(deviceId);
+    if (!chart) return;
+
+    const entries = Object.entries(data);
+    const lastEntries = entries.slice(-20); // Show last 20 readings
+
+    const labels = lastEntries.map(([timestamp]) => {
+        return new Date(timestamp).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    });
+    const temperatures = lastEntries.map(([, temp]) => temp);
+
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = temperatures;
+    chart.update();
+}
+
+// Initialize the dashboard when the page loads
+=======
             interaction: {
                 intersect: false,
                 mode: 'index'
@@ -121,43 +281,6 @@ function setupEventListeners() {
             updateChartData();
         });
     });
-
-    // Settings panel toggle
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsPanel = document.getElementById('settings-panel');
-    const settingsOverlay = document.getElementById('settings-overlay');
-    
-    if (settingsBtn) {
-        settingsBtn.addEventListener('click', () => {
-            settingsPanel.classList.toggle('open');
-            settingsOverlay.classList.toggle('active');
-        });
-    }
-
-    if (settingsOverlay) {
-        settingsOverlay.addEventListener('click', () => {
-            settingsPanel.classList.remove('open');
-            settingsOverlay.classList.remove('active');
-        });
-    }
-
-    // Theme toggle
-    const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) {
-        themeToggle.addEventListener('change', toggleTheme);
-    }
-
-    // Temperature unit toggle
-    const tempUnitToggle = document.getElementById('temp-unit-toggle');
-    if (tempUnitToggle) {
-        tempUnitToggle.addEventListener('change', toggleTemperatureUnit);
-    }
-
-    // Auto-refresh toggle
-    const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
-    if (autoRefreshToggle) {
-        autoRefreshToggle.addEventListener('change', toggleAutoRefresh);
-    }
 }
 
 // Listen to Firebase devices
@@ -187,7 +310,6 @@ function listenToDevices() {
             updateDevicesList();
             updateCurrentDeviceInfo();
             updateTemperatureData();
-            updateLastRefreshTime();
         } else {
             showNoDevicesMessage();
         }
@@ -237,7 +359,8 @@ function updateDevicesList() {
             const logKeys = Object.keys(device.logs).sort();
             if (logKeys.length > 0) {
                 const latestLog = device.logs[logKeys[logKeys.length - 1]];
-                latestTemp = convertTemperature(latestLog).toFixed(1) + getTemperatureUnit();
+                const converted = convertTemperature(latestLog);
+                latestTemp = converted.toFixed(1) + getTemperatureUnit();
             }
         }
         
@@ -290,9 +413,9 @@ function updateCurrentDeviceInfo() {
 function updateTemperatureData() {
     if (!currentDevice || !allDevices[currentDevice] || !allDevices[currentDevice].logs) {
         temperatureElement.textContent = '--';
-        minTempElement.textContent = '--' + getTemperatureUnit();
-        maxTempElement.textContent = '--' + getTemperatureUnit();
-        avgTempElement.textContent = '--' + getTemperatureUnit();
+        minTempElement.textContent = '--°C';
+        maxTempElement.textContent = '--°C';
+        avgTempElement.textContent = '--°C';
         return;
     }
     
@@ -306,7 +429,11 @@ function updateTemperatureData() {
     
     // Update current temperature (latest reading)
     const latestTemp = logEntries[logEntries.length - 1].temperature;
-    temperatureElement.textContent = convertTemperature(latestTemp).toFixed(1);
+    const convertedTemp = convertTemperature(latestTemp);
+    temperatureElement.textContent = convertedTemp.toFixed(1);
+    
+    // Update temperature unit in display
+    document.querySelector('.temp-unit').textContent = getTemperatureUnit();
     
     // Calculate statistics for today
     const now = new Date();
@@ -314,18 +441,22 @@ function updateTemperatureData() {
     const todayEntries = logEntries.filter(entry => entry.timestamp >= startOfDay.getTime());
     
     if (todayEntries.length > 0) {
-        const temperatures = todayEntries.map(entry => convertTemperature(entry.temperature));
+        const temperatures = todayEntries.map(entry => entry.temperature);
         const minTemp = Math.min(...temperatures);
         const maxTemp = Math.max(...temperatures);
         const avgTemp = temperatures.reduce((sum, temp) => sum + temp, 0) / temperatures.length;
         
-        minTempElement.textContent = minTemp.toFixed(1) + getTemperatureUnit();
-        maxTempElement.textContent = maxTemp.toFixed(1) + getTemperatureUnit();
-        avgTempElement.textContent = avgTemp.toFixed(1) + getTemperatureUnit();
+        const unit = getTemperatureUnit();
+        minTempElement.textContent = convertTemperature(minTemp).toFixed(1) + unit;
+        maxTempElement.textContent = convertTemperature(maxTemp).toFixed(1) + unit;
+        avgTempElement.textContent = convertTemperature(avgTemp).toFixed(1) + unit;
     }
     
     // Update chart
     updateChartData();
+    
+    // Update last update timestamp
+    lastUpdateElement.textContent = new Date().toLocaleTimeString();
 }
 
 // Update chart data based on selected time period
@@ -363,7 +494,7 @@ function updateChartData() {
     const filteredData = Object.entries(logs)
         .map(([timestamp, temp]) => ({
             x: parseInt(timestamp),
-            y: convertTemperature(temp)
+            y: temp
         }))
         .filter(entry => entry.x >= startTime)
         .sort((a, b) => a.x - b.x);
@@ -371,20 +502,7 @@ function updateChartData() {
     // Update chart
     chart.data.labels = filteredData.map(entry => entry.x);
     chart.data.datasets[0].data = filteredData;
-    chart.data.datasets[0].label = `Temperature (${getTemperatureUnit()})`;
     chart.update();
-}
-
-// Temperature conversion functions
-function convertTemperature(celsius) {
-    if (settings.temperatureUnit === 'fahrenheit') {
-        return (celsius * 9/5) + 32;
-    }
-    return celsius;
-}
-
-function getTemperatureUnit() {
-    return settings.temperatureUnit === 'fahrenheit' ? '°F' : '°C';
 }
 
 // Show no devices message
@@ -395,85 +513,6 @@ function showNoDevicesMessage() {
     deviceZoneElement.textContent = '--';
     lastSeenElement.textContent = '--';
     deviceStatusElement.textContent = '--';
-}
-
-// Auto-refresh functionality
-function startAutoRefresh() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
-    }
-    
-    refreshInterval = setInterval(() => {
-        updateLastRefreshTime();
-    }, settings.refreshRate);
-}
-
-function stopAutoRefresh() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-    }
-}
-
-function updateLastRefreshTime() {
-    if (lastUpdateElement) {
-        lastUpdateElement.textContent = new Date().toLocaleTimeString();
-    }
-}
-
-// Settings functions
-function loadSettings() {
-    const savedSettings = localStorage.getItem('dashboardSettings');
-    if (savedSettings) {
-        Object.assign(settings, JSON.parse(savedSettings));
-    }
-    
-    // Apply loaded settings
-    if (settings.theme === 'dark') {
-        document.body.classList.add('dark-theme');
-        isDarkTheme = true;
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) themeToggle.checked = true;
-    }
-    
-    const tempUnitToggle = document.getElementById('temp-unit-toggle');
-    if (tempUnitToggle) {
-        tempUnitToggle.checked = settings.temperatureUnit === 'fahrenheit';
-    }
-    
-    const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
-    if (autoRefreshToggle) {
-        autoRefreshToggle.checked = refreshInterval !== null;
-    }
-}
-
-function saveSettings() {
-    localStorage.setItem('dashboardSettings', JSON.stringify(settings));
-}
-
-function toggleTheme() {
-    isDarkTheme = !isDarkTheme;
-    document.body.classList.toggle('dark-theme');
-    settings.theme = isDarkTheme ? 'dark' : 'light';
-    saveSettings();
-}
-
-function toggleTemperatureUnit() {
-    settings.temperatureUnit = settings.temperatureUnit === 'celsius' ? 'fahrenheit' : 'celsius';
-    saveSettings();
-    
-    // Update all temperature displays
-    updateTemperatureData();
-    updateDevicesList();
-}
-
-function toggleAutoRefresh() {
-    const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
-    if (autoRefreshToggle.checked) {
-        startAutoRefresh();
-    } else {
-        stopAutoRefresh();
-    }
 }
 
 // Format time ago
@@ -570,5 +609,52 @@ function exportData() {
     window.URL.revokeObjectURL(url);
 }
 
+// Settings functions
+function toggleSettings() {
+    const panel = document.getElementById('settings-panel');
+    panel.classList.toggle('show');
+}
+
+function updateRefreshInterval() {
+    const select = document.getElementById('refresh-interval');
+    refreshIntervalTime = parseInt(select.value);
+    startAutoRefresh();
+}
+
+function updateTemperatureUnit() {
+    const select = document.getElementById('temperature-unit');
+    temperatureUnit = select.value;
+    
+    // Update all temperature displays
+    if (currentDevice && allDevices[currentDevice]) {
+        updateTemperatureData();
+        updateDevicesList();
+    }
+}
+
+function updateTheme() {
+    const select = document.getElementById('theme-mode');
+    const theme = select.value;
+    
+    if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+    } else {
+        document.body.classList.remove('dark-theme');
+    }
+}
+
+// Temperature conversion utility
+function convertTemperature(celsius) {
+    if (temperatureUnit === 'fahrenheit') {
+        return (celsius * 9/5) + 32;
+    }
+    return celsius;
+}
+
+function getTemperatureUnit() {
+    return temperatureUnit === 'fahrenheit' ? '°F' : '°C';
+}
+
 // Initialize when page loads
+>>>>>>> 4773087 (Refactor dashboard script to improve structure and enhance temperature data handling)
 document.addEventListener('DOMContentLoaded', initDashboard);
