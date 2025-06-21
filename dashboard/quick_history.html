@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Temperature History - Quick View</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        button.active { background: #28a745; }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+        .success { background: #d4edda; color: #155724; border-color: #28a745; }
+        .error { background: #f8d7da; color: #721c24; border-color: #dc3545; }
+        .info { background: #d1ecf1; color: #0c5460; border-color: #17a2b8; }
+        .device-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .device-card:hover {
+            background: #e9ecef;
+            border-color: #007bff;
+        }
+        .device-card.selected {
+            background: #e7f3ff;
+            border-color: #007bff;
+            border-width: 2px;
+        }
+        .device-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .device-info {
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .history-table th,
+        .history-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .history-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .history-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .temp-value {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .chart-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .chart-canvas {
+            max-height: 400px;
+        }
+        .chart-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .chart-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .chart-btn.active {
+            background: #007bff;
+        }
+        .chart-btn:hover {
+            background: #5a6268;
+        }
+        .chart-btn.active:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌡️ ESP32 Temperature History</h1>
+            <p>Quick view of temperature data from your ESP32 devices</p>
+        </div>
+
+        <div class="controls">
+            <button onclick="loadDevices()" id="scanBtn">🔍 Scan for Devices</button>
+            <button onclick="showAllHistory()" id="showAllBtn" disabled>📊 Show All History</button>
+            <button onclick="showRecentHistory()" id="showRecentBtn" disabled>⏰ Show Recent (24h)</button>
+            <button onclick="showChartOnly()" id="showChartBtn" disabled>📈 Chart View</button>
+            <button onclick="exportToCSV()" id="exportBtn" disabled>💾 Export CSV</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="devices"></div>
+        <div id="stats" class="stats-grid" style="display: none;"></div>
+        <div id="chart-section" style="display: none;">
+            <div class="chart-container">
+                <h3>Temperature Chart</h3>
+                <div class="chart-controls">
+                    <button class="chart-btn active" onclick="setChartPeriod('all')" id="chart-all">All Data</button>
+                    <button class="chart-btn" onclick="setChartPeriod('24h')" id="chart-24h">Last 24H</button>
+                    <button class="chart-btn" onclick="setChartPeriod('12h')" id="chart-12h">Last 12H</button>
+                    <button class="chart-btn" onclick="setChartPeriod('6h')" id="chart-6h">Last 6H</button>
+                    <button class="chart-btn" onclick="setChartPeriod('1h')" id="chart-1h">Last 1H</button>
+                </div>
+                <canvas id="tempChart" class="chart-canvas"></canvas>
+            </div>
+        </div>
+        <div id="history"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDu96XHQVxo46thtvzVgPGvNitQX7NroWA",
+            authDomain: "opdesp32.firebaseapp.com",
+            databaseURL: "https://opdesp32-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "opdesp32",
+            storageBucket: "opdesp32.appspot.com",
+            messagingSenderId: "1082565443865",
+            appId: "1:1082565443865:web:8d64cf638398724a993a84"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        let allDevices = {};
+        let selectedDevice = null;
+        let currentHistoryData = [];
+        let tempChart = null;
+        let currentChartPeriod = 'all';
+
+        function addStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            statusDiv.appendChild(div);
+            
+            // Auto-remove after 5 seconds for non-error messages
+            if (type !== 'error') {
+                setTimeout(() => {
+                    if (div.parentElement) {
+                        div.remove();
+                    }
+                }, 5000);
+            }
+        }
+
+        function clearStatus() {
+            document.getElementById('status').innerHTML = '';
+        }
+
+        function loadDevices() {
+            clearStatus();
+            addStatus('🔍 Scanning Firebase for ESP32 devices...', 'info');
+            
+            // Clear previous data
+            document.getElementById('devices').innerHTML = '';
+            document.getElementById('history').innerHTML = '';
+            document.getElementById('stats').style.display = 'none';
+            document.getElementById('chart-section').style.display = 'none';
+            
+            // Destroy existing chart
+            if (tempChart) {
+                tempChart.destroy();
+                tempChart = null;
+            }
+            
+            database.ref('/').once('value', (snapshot) => {
+                const data = snapshot.val();
+                console.log('Firebase data:', data);
+                
+                if (!data) {
+                    addStatus('❌ No data found in Firebase', 'error');
+                    return;
+                }
+                
+                // Find OPD devices at root level
+                const devices = {};
+                Object.keys(data).forEach(key => {
+                    if (key.startsWith('OPD-')) {
+                        console.log(`Found device: ${key}`, data[key]);
+                        
+                        devices[key] = {
+                            zone: data[key].zone || 'Unknown Zone',
+                            lastSeen: data[key].lastSeen || Date.now(),
+                            logs: data[key].logs || {}
+                        };
+                    }
+                });
+                
+                if (Object.keys(devices).length === 0) {
+                    addStatus('❌ No OPD devices found at root level. Checking /devices path...', 'error');
+                    
+                    // Check legacy /devices path
+                    if (data.devices) {
+                        Object.keys(data.devices).forEach(deviceId => {
+                            devices[deviceId] = data.devices[deviceId];
+                        });
+                    }
+                }
+                
+                if (Object.keys(devices).length === 0) {
+                    addStatus('❌ No ESP32 devices found in Firebase. Make sure your ESP32 is connected and sending data.', 'error');
+                    return;
+                }
+                
+                allDevices = devices;
+                const deviceCount = Object.keys(devices).length;
+                addStatus(`✅ Found ${deviceCount} ESP32 device(s)!`, 'success');
+                
+                displayDevices();
+                
+                // Enable buttons
+                document.getElementById('showAllBtn').disabled = false;
+                document.getElementById('showRecentBtn').disabled = false;
+                document.getElementById('showChartBtn').disabled = false;
+                
+            }).catch((error) => {
+                console.error('Firebase error:', error);
+                addStatus(`❌ Firebase connection error: ${error.message}`, 'error');
+            });
+        }
+
+        function displayDevices() {
+            const devicesDiv = document.getElementById('devices');
+            devicesDiv.innerHTML = '<h3>Available Devices:</h3>';
+            
+            Object.keys(allDevices).forEach(deviceId => {
+                const device = allDevices[deviceId];
+                const logCount = Object.keys(device.logs || {}).length;
+                
+                const deviceCard = document.createElement('div');
+                deviceCard.className = 'device-card';
+                deviceCard.onclick = () => selectDevice(deviceId);
+                
+                deviceCard.innerHTML = `
+                    <div class="device-name">${deviceId}</div>
+                    <div class="device-info">
+                        Zone: ${device.zone} | 
+                        Temperature logs: ${logCount} | 
+                        Last seen: ${device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Unknown'}
+                    </div>
+                `;
+                
+                devicesDiv.appendChild(deviceCard);
+            });
+        }
+
+        function selectDevice(deviceId) {
+            selectedDevice = deviceId;
+            
+            // Update UI to show selected device
+            document.querySelectorAll('.device-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.target.closest('.device-card').classList.add('selected');
+            
+            addStatus(`📱 Selected device: ${deviceId}`, 'info');
+            
+            // Enable export button
+            document.getElementById('exportBtn').disabled = false;
+        }
+
+        function showAllHistory() {
+            if (!selectedDevice) {
+                addStatus('⚠️ Please select a device first', 'error');
+                return;
+            }
+            
+            showHistory(false);
+        }
+
+        function showRecentHistory() {
+            if (!selectedDevice) {
+                addStatus('⚠️ Please select a device first', 'error');
+                return;
+            }
+            
+            showHistory(true);
+        }
+
+        function showChartOnly() {
+            if (!selectedDevice) {
+                addStatus('⚠️ Please select a device first', 'error');
+                return;
+            }
+            
+            const device = allDevices[selectedDevice];
+            const logs = device.logs || {};
+            
+            if (Object.keys(logs).length === 0) {
+                addStatus('❌ No temperature logs found for this device', 'error');
+                return;
+            }
+            
+            clearStatus();
+            addStatus(`📈 Loading temperature chart for ${selectedDevice}...`, 'info');
+            
+            // Convert logs to array format (same as showHistory)
+            let entries = Object.entries(logs).map(([timestamp, temp]) => {
+                let absoluteTimestamp = parseInt(timestamp);
+                
+                if (absoluteTimestamp < 1000000000000) {
+                    const baseTime = device.lastSeen || Date.now();
+                    const totalEntries = Object.keys(logs).length;
+                    const entryIndex = Object.keys(logs).indexOf(timestamp);
+                    absoluteTimestamp = baseTime - ((totalEntries - entryIndex - 1) * 10000);
+                }
+                
+                return {
+                    timestamp: absoluteTimestamp,
+                    temperature: parseFloat(temp),
+                    date: new Date(absoluteTimestamp)
+                };
+            });
+            
+            entries.sort((a, b) => a.timestamp - b.timestamp);
+            currentHistoryData = entries;
+            
+            // Hide table and stats, show only chart
+            document.getElementById('history').innerHTML = '';
+            document.getElementById('stats').style.display = 'none';
+            
+            // Show temperature chart
+            displayTemperatureChart(entries);
+            
+            addStatus(`✅ Loaded chart with ${entries.length} temperature readings`, 'success');
+        }
+
+        function showHistory(recentOnly = false) {
+            const device = allDevices[selectedDevice];
+            const logs = device.logs || {};
+            
+            if (Object.keys(logs).length === 0) {
+                addStatus('❌ No temperature logs found for this device', 'error');
+                return;
+            }
+            
+            clearStatus();
+            addStatus(`📊 Loading temperature history for ${selectedDevice}...`, 'info');
+            
+            // Convert logs to array format
+            let entries = Object.entries(logs).map(([timestamp, temp]) => {
+                let absoluteTimestamp = parseInt(timestamp);
+                
+                // Handle relative timestamps (convert to absolute)
+                if (absoluteTimestamp < 1000000000000) {
+                    // Assume 10-second intervals, work backwards from last seen
+                    const baseTime = device.lastSeen || Date.now();
+                    const totalEntries = Object.keys(logs).length;
+                    const entryIndex = Object.keys(logs).indexOf(timestamp);
+                    absoluteTimestamp = baseTime - ((totalEntries - entryIndex - 1) * 10000);
+                }
+                
+                return {
+                    timestamp: absoluteTimestamp,
+                    temperature: parseFloat(temp),
+                    date: new Date(absoluteTimestamp)
+                };
+            });
+            
+            // Filter for recent data if requested (last 24 hours)
+            if (recentOnly) {
+                const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+                entries = entries.filter(entry => entry.timestamp >= oneDayAgo);
+                addStatus(`📅 Showing data from last 24 hours`, 'info');
+            } else {
+                addStatus(`📅 Showing all available data`, 'info');
+            }
+            
+            // Sort by timestamp (oldest first)
+            entries.sort((a, b) => a.timestamp - b.timestamp);
+            
+            if (entries.length === 0) {
+                addStatus('❌ No data found for the selected time period', 'error');
+                return;
+            }
+            
+            currentHistoryData = entries;
+            
+            // Show statistics
+            displayStatistics(entries);
+            
+            // Show temperature chart
+            displayTemperatureChart(entries);
+            
+            // Show history table
+            displayHistoryTable(entries);
+            
+            addStatus(`✅ Loaded ${entries.length} temperature readings`, 'success');
+        }
+
+        function displayStatistics(entries) {
+            const temperatures = entries.map(e => e.temperature);
+            const avgTemp = temperatures.reduce((sum, temp) => sum + temp, 0) / temperatures.length;
+            const minTemp = Math.min(...temperatures);
+            const maxTemp = Math.max(...temperatures);
+            const timeSpan = entries.length > 1 ? 
+                new Date(entries[entries.length - 1].timestamp - entries[0].timestamp).toISOString().substr(11, 8) : 
+                '0:00:00';
+            
+            const statsDiv = document.getElementById('stats');
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${entries.length}</div>
+                    <div class="stat-label">Total Readings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgTemp.toFixed(1)}°C</div>
+                    <div class="stat-label">Average Temperature</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${minTemp.toFixed(1)}°C</div>
+                    <div class="stat-label">Minimum Temperature</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${maxTemp.toFixed(1)}°C</div>
+                    <div class="stat-label">Maximum Temperature</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${timeSpan}</div>
+                    <div class="stat-label">Time Span</div>
+                </div>
+            `;
+            statsDiv.style.display = 'grid';
+        }
+
+        function displayHistoryTable(entries) {
+            const historyDiv = document.getElementById('history');
+            
+            let tableHTML = `
+                <h3>Temperature History for ${selectedDevice}</h3>
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Temperature</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            // Show most recent first
+            entries.reverse().forEach(entry => {
+                tableHTML += `
+                    <tr>
+                        <td>${entry.date.toLocaleString()}</td>
+                        <td class="temp-value">${entry.temperature.toFixed(1)}°C</td>
+                        <td>${entry.timestamp}</td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+            
+            historyDiv.innerHTML = tableHTML;
+        }
+
+        function displayTemperatureChart(entries) {
+            const chartSection = document.getElementById('chart-section');
+            chartSection.style.display = 'block';
+            
+            // Prepare chart data
+            const chartData = getChartDataForPeriod(entries, currentChartPeriod);
+            
+            // Destroy existing chart if it exists
+            if (tempChart) {
+                tempChart.destroy();
+            }
+            
+            const ctx = document.getElementById('tempChart').getContext('2d');
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.map(entry => entry.date.toLocaleString()),
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: chartData.map(entry => entry.temperature),
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#007bff',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Temperature: ${context.parsed.y.toFixed(1)}°C`;
+                                },
+                                title: function(context) {
+                                    return new Date(chartData[context[0].dataIndex].timestamp).toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)'
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
+                            },
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function getChartDataForPeriod(entries, period) {
+            if (period === 'all') {
+                return entries;
+            }
+            
+            const now = Date.now();
+            let cutoffTime;
+            
+            switch (period) {
+                case '1h':
+                    cutoffTime = now - (60 * 60 * 1000);
+                    break;
+                case '6h':
+                    cutoffTime = now - (6 * 60 * 60 * 1000);
+                    break;
+                case '12h':
+                    cutoffTime = now - (12 * 60 * 60 * 1000);
+                    break;
+                case '24h':
+                    cutoffTime = now - (24 * 60 * 60 * 1000);
+                    break;
+                default:
+                    return entries;
+            }
+            
+            return entries.filter(entry => entry.timestamp >= cutoffTime);
+        }
+
+        function setChartPeriod(period) {
+            currentChartPeriod = period;
+            
+            // Update button states
+            document.querySelectorAll('.chart-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`chart-${period}`).classList.add('active');
+            
+            // Update chart if data is available
+            if (currentHistoryData.length > 0) {
+                displayTemperatureChart(currentHistoryData);
+            }
+        }
+
+        function exportToCSV() {
+            if (!selectedDevice || currentHistoryData.length === 0) {
+                addStatus('⚠️ No data to export. Please load history first.', 'error');
+                return;
+            }
+            
+            let csvContent = 'Device ID,Zone,Date,Time,Timestamp,Temperature (°C)\n';
+            
+            currentHistoryData.forEach(entry => {
+                const device = allDevices[selectedDevice];
+                csvContent += `${selectedDevice},${device.zone},${entry.date.toLocaleDateString()},${entry.date.toLocaleTimeString()},${entry.timestamp},${entry.temperature}\n`;
+            });
+            
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const now = new Date();
+            const filename = `${selectedDevice}_temperature_history_${now.toISOString().split('T')[0]}.csv`;
+            
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            addStatus(`✅ Exported ${currentHistoryData.length} records to ${filename}`, 'success');
+        }
+
+        // Auto-load devices on page load
+        window.onload = function() {
+            addStatus('🚀 Page loaded. Click "Scan for Devices" to start.', 'info');
+        };
+    </script>
+</body>
+</html>
