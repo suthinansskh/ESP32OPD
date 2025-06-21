@@ -1,29 +1,46 @@
-// Firebase configuration - Replace with your Firebase config
+// Firebase configuration
 const firebaseConfig = {
-    // TODO: Replace with your Firebase configuration
-    apiKey: "your-api-key",
-    authDomain: "your-project-id.firebaseapp.com",
-    databaseURL: "https://your-project-id.firebaseio.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project-id.appspot.com",
-    messagingSenderId: "your-messaging-sender-id",
-    appId: "your-app-id"
+    apiKey: "AIzaSyDu96XHQVxo46thtvzVgPGvNitQX7NroWA",
+    authDomain: "opdesp32.firebaseapp.com",
+    databaseURL: "https://opdesp32-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "opdesp32",
+    storageBucket: "opdesp32.appspot.com",
+    messagingSenderId: "1082565443865",
+    appId: "1:1082565443865:web:8d64cf638398724a993a84"
 };
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-<<<<<<< HEAD
-// Device configuration
-const DEVICE_CONFIG = [
-    { id: "esp32-01", zone: "Building 1" },
-    { id: "esp32-02", zone: "Building 2" },
-    { id: "esp32-03", zone: "Building 3" },
-];
+// Global variables
+let currentDevice = null;
+let allDevices = {};
+let temperatureData = [];
+let chart = null;
+let currentPeriod = '1h';
+let refreshInterval = null;
+let isDarkTheme = false;
 
-// Chart configurations
-const chartConfigs = new Map();
+// Dashboard settings
+const settings = {
+    refreshRate: 10000, // 10 seconds
+    temperatureUnit: 'celsius',
+    theme: 'light'
+};
+
+// DOM elements
+const connectionStatus = document.getElementById('connection-status');
+const deviceIdElement = document.getElementById('device-id');
+const deviceZoneElement = document.getElementById('device-zone');
+const lastSeenElement = document.getElementById('last-seen');
+const deviceStatusElement = document.getElementById('device-status');
+const lastUpdateElement = document.getElementById('last-update');
+const temperatureElement = document.getElementById('temperature');
+const minTempElement = document.getElementById('min-temp');
+const maxTempElement = document.getElementById('max-temp');
+const avgTempElement = document.getElementById('avg-temp');
+const devicesContainer = document.getElementById('devices-container');
 
 // Initialize the dashboard
 function initDashboard() {
