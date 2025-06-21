@@ -169,6 +169,12 @@ function setupEventListeners() {
     if (autoRefreshToggle) {
         autoRefreshToggle.addEventListener('change', toggleAutoRefresh);
     }
+
+    // Device dropdown change
+    const deviceDropdown = document.getElementById('device-dropdown');
+    if (deviceDropdown) {
+        deviceDropdown.addEventListener('change', handleDeviceDropdownChange);
+    }
 }
 
 // Start dashboard
@@ -1302,3 +1308,34 @@ function generateDeviceBackgroundColor(borderColor) {
     }
     return borderColor.replace('rgb', 'rgba').replace(')', ', 0.1)');
 }
+
+// Populate device dropdown
+function populateDeviceDropdown(devices) {
+    const dropdown = document.getElementById('device-dropdown');
+    dropdown.innerHTML = '<option value="">-- Select a Device --</option>'; // Reset options
+    Object.keys(devices).forEach(deviceId => {
+        const option = document.createElement('option');
+        option.value = deviceId;
+        option.textContent = devices[deviceId].name || deviceId;
+        dropdown.appendChild(option);
+    });
+}
+
+// Handle device dropdown change
+function handleDeviceDropdownChange() {
+    const dropdown = document.getElementById('device-dropdown');
+    const selectedDeviceId = dropdown.value;
+    const message = document.getElementById('single-device-message');
+
+    if (selectedDeviceId) {
+        currentDevice = selectedDeviceId;
+        message.textContent = `Selected device: ${allDevices[selectedDeviceId].name || selectedDeviceId}`;
+        updateChartData(selectedDeviceId); // Update chart for the selected device
+    } else {
+        currentDevice = null;
+        message.textContent = 'No device selected';
+    }
+}
+
+// Call this function after fetching devices
+populateDeviceDropdown(allDevices);

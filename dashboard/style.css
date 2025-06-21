@@ -2501,3 +2501,31 @@ body.dark-theme .device-info-header {
         font-size: 14px;
     }
 }
+
+/* Styles for single device selection dropdown */
+.single-device-selection {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.single-device-selection h2 {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+#device-dropdown {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+.no-device-selected {
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #666;
+}
