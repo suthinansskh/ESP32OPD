@@ -41,6 +41,24 @@ bool firebaseInitialized = false;
 unsigned long firebaseReconnectTimer = 0;
 const unsigned long FIREBASE_RECONNECT_INTERVAL = 30000; // 30 seconds
 
+// Define Firebase root certificate
+const char FB_ESP_CLIENT_ROOT_CERT[] PROGMEM = R"CERT(
+-----BEGIN CERTIFICATE-----
+MIIFVzCCAz+gAwIBAgINAgPlk28xsBNJiGuiFzANBgkqhkiG9w0BAQwFADCBkDEL
+MAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4GA1UE
+BxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxNjA0BgNVBAMT
+LUNPTU9ETyBSU0EgRG9tYWluIFZhbGlkYXRpb24gU2VjdXJlIFNlcnZlciBDQTAe
+Fw0xNDEyMDMwMDAwMDBaFw0yOTEyMDIyMzU5NTlaMIGQMQswCQYDVQQGEwJHQjEb
+MBkGA1UECBMSR3JlYXRlciBNYW5jaGVzdGVyMRAwDgYDVQQHEwdTYWxmb3JkMRow
+GAYDVQQKExFDT01PRE8gQ0EgTGltaXRlZDE2MDQGA1UEAxMtQ09NT0RPIFJTRDEN
+b21haW4gVmFsaWRhdGlvbiBTZWN1cmUgU2VydmVyIENBMIICIjANBgkqhkiG9w0B
+AQEFAAOCAg8AMIICCgKCAgEAkehUiapY4g25TkQUuQEcx+PS9/L7Q8ahC+5BVhWv
+cRg8Zr5k7JZOPOVuW0l3BXXFCNqN8PJ7Q9GWz5qMf2kFCNQKP5YCJKz3nKQD8X5t
+8OaKMOKP8X0aAbxJO+3K3zKWwQ5q7HzKV2uOtpfgd+Ux4+4qI0SH7J8zM9K6vO2H
+zK3X0U3q9Y8L7X2X0x0W7j8b9J4J8lJ8KJ8J3J4J8U3X0U3O7J8J3J4Wb2V3m8J9
+-----END CERTIFICATE-----
+)CERT";
+
 // DS18B20
 #define ONE_WIRE_BUS 13
 OneWire oneWire(ONE_WIRE_BUS);
@@ -48,6 +66,7 @@ DallasTemperature sensors(&oneWire);
 
 // Device ID config
 char deviceID[32] = "";
+<<<<<<< HEAD
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 0;
 const int   daylightOffset_sec = 0;
@@ -55,6 +74,9 @@ const int   daylightOffset_sec = 0;
 // Temperature reading interval (5 seconds)
 const unsigned long TEMP_READ_INTERVAL = 5000;
 unsigned long lastTempRead = 0;
+=======
+char deviceZone[40] = "building_1";
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
 
 void saveDeviceID(const char* id) {
   EEPROM.begin(64);
@@ -198,6 +220,8 @@ void setup() {
   WiFiManager wm;
   WiFiManagerParameter custom_id("device_id", "Device ID", deviceID, 32);
   wm.addParameter(&custom_id);
+  WiFiManagerParameter custom_zone("zone", "Device Zone", deviceZone, 40);
+  wm.addParameter(&custom_zone);
 
   if (!wm.autoConnect("ESP32_Setup")) {
     Serial.println("Failed to connect. Restarting...");
@@ -209,11 +233,14 @@ void setup() {
   saveDeviceID(deviceID);
   loadDeviceID();
 
+  strcpy(deviceZone, custom_zone.getValue());
+
   Serial.print("Connected! Device ID: ");
   Serial.println(deviceID);
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
+<<<<<<< HEAD
   // Init time
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   // Firebase configuration
@@ -229,6 +256,28 @@ void setup() {
   // Wait for Firebase to be ready
   unsigned long firebaseTimeout = millis();
   while (!Firebase.ready() && millis() - firebaseTimeout < 10000) {
+=======
+  // Firebase configuration - Simplified approach using database secret
+  Serial.println("Configuring Firebase...");
+  
+  // Use database secret for authentication instead of API key
+  config.database_url = FIREBASE_HOST;
+  config.signer.tokens.legacy_token = FIREBASE_DATABASE_SECRET;
+  
+  Serial.println("Initializing Firebase with database secret...");
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+  
+  Serial.println("Firebase.begin() completed");
+  
+  // Try without authentication first - use open Firebase rules
+  Serial.println("Testing Firebase connection without authentication...");
+  
+  // Wait for Firebase to initialize
+  Serial.println("Waiting for Firebase initialization...");
+  unsigned long startTime = millis();
+  while (!Firebase.ready() && (millis() - startTime) < 30000) {
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
     Serial.print(".");
     delay(300);
   }
@@ -272,6 +321,7 @@ void checkDeviceConfig() {
     return;
   }
   
+<<<<<<< HEAD
   Serial.println("Checking device configuration...");
   
   char configPath[50];
@@ -285,6 +335,39 @@ void checkDeviceConfig() {
     alertEnabled = fbdo.boolData();
     Serial.print("Alert enabled: ");
     Serial.println(alertEnabled ? "Yes" : "No");
+=======
+  if (Firebase.ready()) {
+    Serial.println("\nFirebase ready!");
+
+    // Set device zone directly under device ID (matching Firebase rules)
+    String zonePath = String("/devices/") + String(deviceID) + String("/zone");
+    if (Firebase.RTDB.setString(&fbdo, zonePath.c_str(), deviceZone)) {
+      Serial.println(String("✅ Set device zone: ") + String(deviceZone));
+    } else {
+      Serial.println(String("❌ Failed to set device zone: ") + String(fbdo.errorReason()));
+    }
+
+    // Set last seen timestamp
+    String lastSeenPath = String("/devices/") + String(deviceID) + String("/lastSeen");
+    if (Firebase.RTDB.setTimestamp(&fbdo, lastSeenPath.c_str())) {
+      Serial.println("✅ Set initial lastSeen timestamp.");
+    } else {
+      Serial.println(String("❌ Failed to set lastSeen: ") + String(fbdo.errorReason()));
+    }
+
+  } else {
+    Serial.println("\nFirebase failed to initialize after 30 seconds");
+    Serial.println("Trying basic connection test...");
+    
+    // Try a simple test connection
+    String testPath = "/test";
+    if (Firebase.RTDB.setString(&fbdo, testPath.c_str(), "hello")) {
+      Serial.println("✅ Test write successful - Firebase is working!");
+    } else {
+      Serial.println(String("❌ Test write failed: ") + String(fbdo.errorReason()));
+      Serial.println(String("Error Code: ") + String(fbdo.errorCode()));
+    }
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
   }
   
   // Check for threshold setting
@@ -324,6 +407,7 @@ void sendTelegramAlert(float temperature) {
 }
 
 void loop() {
+<<<<<<< HEAD
   unsigned long currentMillis = millis();
   
   // Handle temperature reading
@@ -343,6 +427,65 @@ void loop() {
       }
     } else {
       Serial.println("Error reading temperature");
+=======
+  sensors.requestTemperatures();
+  float tempC = sensors.getTempCByIndex(0);
+
+  // Debug DS18B20 sensor
+  int deviceCount = sensors.getDeviceCount();
+  Serial.printf("DS18B20 devices found: %d\n", deviceCount);
+
+  // Check if temperature reading is valid
+  if (tempC == DEVICE_DISCONNECTED_C || tempC == 85.0) {
+    tempC = -999.0; // Invalid reading indicator
+    Serial.println("Error: DS18B20 sensor disconnected or reading error!");
+  } else {
+    Serial.printf("Temperature reading: %.2f°C\n", tempC);
+  }
+
+  // Display on OLED
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.printf("Device: %s\n", deviceID);
+  
+  if (tempC == -999.0) {
+    display.printf("Temp: ERROR\n");
+  } else {
+    display.printf("Temp: %.2f C\n", tempC);
+  }
+  
+  display.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+  display.printf("WiFi: %s\n", WiFi.status() == WL_CONNECTED ? "OK" : "ERROR");
+  display.printf("Firebase: %s", Firebase.ready() ? "OK" : "ERROR");
+  display.display();
+
+  // Send to Firebase only if temperature is valid
+  if (Firebase.ready() && strlen(deviceID) > 0 && tempC != -999.0) {
+    String path = String("/devices/") + String(deviceID) + String("/logs/") + String(millis());
+    if (Firebase.RTDB.setFloat(&fbdo, path.c_str(), tempC)) {
+      Serial.println(String("✅ Sent to Firebase: ") + String(path) + String(" = ") + String(tempC));
+
+      // Update lastSeen timestamp as well
+      String lastSeenPath = String("/devices/") + String(deviceID) + String("/lastSeen");
+      if (Firebase.RTDB.setTimestamp(&fbdo, lastSeenPath.c_str())) {
+        Serial.println("✅ Updated lastSeen timestamp.");
+      } else {
+        Serial.println(String("❌ Failed to update lastSeen: ") + String(fbdo.errorReason()));
+      }
+
+    } else {
+      Serial.println(String("❌ Failed to send to Firebase: ") + String(fbdo.errorReason()));
+      Serial.println(String("Error Code: ") + String(fbdo.errorCode()));
+    }
+  } else {
+    if (tempC == -999.0) {
+      Serial.println("⚠️ Skipping Firebase upload - invalid temperature reading");
+    } else if (!Firebase.ready()) {
+      Serial.println(String("⚠️ Firebase not ready - check API key and internet connection"));
+      Serial.println(String("Firebase error details: ") + String(fbdo.errorReason()));
+    } else if (strlen(deviceID) == 0) {
+      Serial.println("⚠️ Device ID not set");
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
     }
   }
 

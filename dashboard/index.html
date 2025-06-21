@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Temperature Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
+<<<<<<< HEAD
         <h1>ESP32 Temperature Logs by Zone</h1>
         <div class="zone-selector">
             <label for="zone-select">Select Zone:</label>
@@ -20,9 +22,82 @@
         </div>
         <div id="devices-container">
             <!-- Device cards will be dynamically inserted here -->
+=======
+        <header>
+            <h1><i class="fas fa-thermometer-half"></i> ESP32 Temperature Monitoring</h1>
+            <div class="connection-status" id="connection-status">
+                <i class="fas fa-circle"></i> Connecting...
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <div class="card device-info">
+                <h2><i class="fas fa-microchip"></i> Device Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Device ID:</label>
+                        <span id="device-id">--</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Zone:</label>
+                        <span id="device-zone">--</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Last Seen:</label>
+                        <span id="last-seen">--</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Status:</label>
+                        <span id="device-status" class="status-indicator">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card current-temp">
+                <h2><i class="fas fa-temperature-high"></i> Current Temperature</h2>
+                <div class="temp-display">
+                    <span id="temperature" class="temp-value">--</span>
+                    <span class="temp-unit">°C</span>
+                </div>
+                <div class="temp-info">
+                    <div class="temp-stat">
+                        <label>Min Today:</label>
+                        <span id="min-temp">--°C</span>
+                    </div>
+                    <div class="temp-stat">
+                        <label>Max Today:</label>
+                        <span id="max-temp">--°C</span>
+                    </div>
+                    <div class="temp-stat">
+                        <label>Average:</label>
+                        <span id="avg-temp">--°C</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card chart-container">
+                <h2><i class="fas fa-chart-line"></i> Temperature History</h2>
+                <div class="chart-controls">
+                    <button class="time-btn active" data-period="1h">1H</button>
+                    <button class="time-btn" data-period="6h">6H</button>
+                    <button class="time-btn" data-period="24h">24H</button>
+                    <button class="time-btn" data-period="7d">7D</button>
+                </div>
+                <canvas id="temp-chart"></canvas>
+            </div>
+
+            <div class="card devices-list">
+                <h2><i class="fas fa-list"></i> All Devices</h2>
+                <div id="devices-container">
+                    <!-- Devices will be populated here -->
+                </div>
+            </div>
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="script.js"></script>

@@ -1,18 +1,34 @@
+<<<<<<< HEAD
+=======
+/* Modern Dashboard Styles */
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+<<<<<<< HEAD
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 body {
     background-color: #f5f5f5;
     color: #333;
+=======
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #333;
+    min-height: 100vh;
+    line-height: 1.6;
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
 }
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
+<<<<<<< HEAD
     padding: 2rem;
 }
 
@@ -64,4 +80,282 @@ h1 {
 
 .hidden {
     display: none;
+=======
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    color: white;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.connection-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    font-size: 0.9rem;
+}
+
+.connection-status.connected {
+    background: rgba(34, 197, 94, 0.2);
+}
+
+.connection-status.disconnected {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.card h2 {
+    color: #374151;
+    font-size: 1.25rem;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card h2 i {
+    color: #667eea;
+}
+
+/* Device Information Card */
+.device-info {
+    grid-column: span 1;
+}
+
+.info-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.info-item span {
+    font-weight: 500;
+    color: #111827;
+}
+
+.status-indicator.online {
+    color: #10b981;
+}
+
+.status-indicator.offline {
+    color: #ef4444;
+}
+
+/* Current Temperature Card */
+.current-temp {
+    grid-column: span 1;
+}
+
+.temp-display {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.temp-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #667eea;
+}
+
+.temp-unit {
+    font-size: 1.5rem;
+    color: #6b7280;
+    margin-left: 8px;
+}
+
+.temp-info {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.temp-stat {
+    text-align: center;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.temp-stat label {
+    display: block;
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.temp-stat span {
+    font-weight: 600;
+    color: #111827;
+}
+
+/* Chart Card */
+.chart-container {
+    grid-column: span 2;
+    min-height: 400px;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.time-btn {
+    padding: 8px 16px;
+    border: 2px solid #e5e7eb;
+    background: white;
+    color: #6b7280;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.time-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.time-btn.active {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+#temp-chart {
+    max-height: 300px;
+}
+
+/* Devices List Card */
+.devices-list {
+    grid-column: span 1;
+}
+
+.device-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: #f9fafb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.device-item:hover {
+    background: #f3f4f6;
+}
+
+.device-item.active {
+    background: #667eea;
+    color: white;
+}
+
+.device-name {
+    font-weight: 600;
+}
+
+.device-zone {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.device-item.active .device-zone {
+    color: rgba(255,255,255,0.8);
+}
+
+.device-temp {
+    font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .chart-container {
+        grid-column: span 1;
+    }
+    
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .temp-value {
+        font-size: 2.5rem;
+    }
+    
+    .temp-info {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+}
+
+/* Loading Animation */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+>>>>>>> 919e022 (Enhance ESP32 Temperature Dashboard with improved UI and Firebase integration)
 }
