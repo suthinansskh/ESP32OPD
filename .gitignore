@@ -1,5 +1,53 @@
-.pio
+# PlatformIO
+.pio/
 .vscode/.browse.c_cpp.db*
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+*.tmp
+*.bak
+
+# Compiled binaries
+*.bin
+*.elf
+*.hex
+
+# Build artifacts
+build/
+.pioenvs/
+.piolibdeps/
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+secrets.h
+
+# Node modules (if any)
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Java build artifacts
+target/
+*.class
+
+# Firebase config (keep template but exclude sensitive data)
+firebase-config-private.h
+
+# Test files
+test_results/
