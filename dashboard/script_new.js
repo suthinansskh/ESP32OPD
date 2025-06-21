@@ -306,16 +306,16 @@ function groupDevicesByZone() {
 // Update devices display by zone
 function updateDevicesDisplay() {
     if (!zonesContainer) return;
-    
+
     zonesContainer.innerHTML = '';
-    
+
     Object.keys(devicesByZone).forEach(zoneName => {
         const devices = devicesByZone[zoneName];
-        
+
         // Create zone group
         const zoneGroup = document.createElement('div');
         zoneGroup.className = 'zone-group';
-        
+
         // Zone header
         const zoneHeader = document.createElement('div');
         zoneHeader.className = 'zone-header';
@@ -323,16 +323,19 @@ function updateDevicesDisplay() {
             <i class="fas fa-map-marker-alt"></i>
             <span>${zoneName} (${devices.length} devices)</span>
         `;
-        
+
         // Zone devices container
         const zoneDevices = document.createElement('div');
         zoneDevices.className = 'zone-devices';
-        
+        zoneDevices.style.display = 'grid';
+        zoneDevices.style.gridTemplateColumns = 'repeat(4, 1fr)';
+        zoneDevices.style.gap = '10px';
+
         devices.forEach(device => {
             const deviceCard = createDeviceCard(device);
             zoneDevices.appendChild(deviceCard);
         });
-        
+
         zoneGroup.appendChild(zoneHeader);
         zoneGroup.appendChild(zoneDevices);
         zonesContainer.appendChild(zoneGroup);
